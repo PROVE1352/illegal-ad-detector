@@ -106,7 +106,7 @@ fill('f-area',F.map(f=>f.area));fill('f-cat',F.map(f=>f.category));fill('f-tech'
 let sortK='priority',sortDir=1;
 const PORD={'긴급':0,'높음':1,'보통':2};
 function guideHtml(f){return f.guide.map(g=>`<div><b>${esc(g.name)}</b> — ${esc(g.summary)}<ol class="steps">${g.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol></div>`).join('')+`<div><small>신고처: ${esc(f.contact)}</small></div>`;}
-function copy(t,btn){navigator.clipboard&&navigator.clipboard.writeText(t).then(()=>{btn.textContent='복사됨';setTimeout(()=>btn.textContent='복사',900)});}
+function copy(btn){const t=btn.dataset.v||'';if(navigator.clipboard){navigator.clipboard.writeText(t).then(()=>{btn.textContent='복사됨';setTimeout(()=>btn.textContent='복사',900)}).catch(()=>{})}else{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove();btn.textContent='복사됨';setTimeout(()=>btn.textContent='복사',900)}}
 function setStatus(fp,v){STATE[fp]=Object.assign(st({fingerprint:fp}),{status:v});saveState();cards();render(false)}
 function setMemo(fp,v){STATE[fp]=Object.assign(st({fingerprint:fp}),{memo:v});saveState()}
 function filtered(){
@@ -121,8 +121,8 @@ function render(focus=true){
  document.getElementById('rows').innerHTML=rows.map(f=>{const s=st(f);return `<tr class="status-${s.status==='완료'?'done':'open'}">
  <td class="p-${f.priority}">${f.priority}<br><small class="r-${f.risk}">${f.risk} ${f.score}</small></td><td><span class="tag area">${esc(f.area)}</span></td>
  <td>${f.official.map(o=>`<span class="tag off">${o}</span>`).join('')}${f.extra_names.map(o=>`<span class="tag">${esc(o)}</span>`).join('')}</td><td>${esc(f.category)}</td>
- <td><a href="${esc(f.page_url)}" target="_blank" rel="noopener">${esc(f.page_url)}</a><button class="copy" onclick="copy(${JSON.stringify(f.page_url)},this)">복사</button><br><small class="loc">${esc(f.defanged_url)}</small>${f.frame_url?`<br><small>iframe: ${esc(f.frame_url)}</small>`:''}</td>
- <td class="loc">${esc(f.location)}<button class="copy" onclick="copy(${JSON.stringify(f.location)},this)">복사</button><br><span class="fp">SHA-256 ${f.fingerprint.slice(0,16)}…</span></td>
+ <td><a href="${esc(f.page_url)}" target="_blank" rel="noopener">${esc(f.page_url)}</a><button class="copy" data-v="${esc(f.page_url)}" onclick="copy(this)">복사</button><br><small class="loc">${esc(f.defanged_url)}</small>${f.frame_url?`<br><small>iframe: ${esc(f.frame_url)}</small>`:''}</td>
+ <td class="loc">${esc(f.location)}<button class="copy" data-v="${esc(f.location)}" onclick="copy(this)">복사</button><br><span class="fp">SHA-256 ${f.fingerprint.slice(0,16)}…</span></td>
  <td>${esc(f.evidence_text.slice(0,200))}${f.links.length?`<br><small class="loc">링크: ${f.defanged_links.map(esc).join(', ')}</small>`:''}</td>
  <td><details><summary>조치 가이드</summary>${guideHtml(f)}</details><details><summary>근거 ${f.evidence.length}개</summary><ul class="ev">${f.evidence.map(e=>`<li class="${e.weight<0?'neg':''}">${esc(e.detail)} <small>(${e.weight>0?'+':''}${e.weight})</small></li>`).join('')}</ul><pre>${esc(f.html)}</pre>${f.screenshot?`<img class="shot" src="${esc(f.screenshot)}">`:''}</details></td>
  <td><select onchange="setStatus('${f.fingerprint}',this.value)">${['미처리','조치중','완료'].map(v=>`<option ${s.status===v?'selected':''}>${v}</option>`).join('')}</select><br><textarea rows="2" cols="14" placeholder="담당/메모" onchange="setMemo('${f.fingerprint}',this.value)">${esc(s.memo)}</textarea></td></tr>`}).join('');
