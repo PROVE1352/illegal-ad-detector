@@ -83,7 +83,7 @@ uv run pytest -q
 ### 4종 판정 기준(오탐이 정확도 감점이라 보수적으로)
 | 코드 | 조건 |
 |---|---|
-| OFFSCREEN | display:none(hidden 속성 포함) / font-size 0~1px(0, 0px, 0em, 0~6%, font 단축 `0/0`) / position(+left·top·right·bottom·inset)·text-indent·transform translate·음수 margin 으로 화면 밖(≤-500px) 이거나 absolute/fixed 로 뷰포트 밖 양수(≥5000px) / overflow:hidden 조상 상자(명시 크기) 밖에 absolute 배치 / 잘림(1×1·0 크기+overflow:hidden, clip:rect(0 0 0 0), clip-path inset(100%)·circle(0), transform:scale(0), max-height 0+overflow hidden) **+** 요소 텍스트에 가중치 2.0 이상 키워드, 또는 같은 범주 키워드 합 3.0 이상(슬롯 1.5+카지노 1.5), 또는 난독화와 겹치면 1.0 이상 |
+| OFFSCREEN | display:none(hidden 속성 포함) / font-size 0~1px(0, 0px, 0em, 0~6%, font 단축 `0/0`) / position(+left·top·right·bottom·inset)·text-indent·transform translate·음수 margin 으로 화면 밖(≤-500px) 이거나 absolute/fixed 로 뷰포트 밖 양수(≥5000px) / overflow:hidden 조상 상자(명시 크기) 밖에 absolute 배치 / 잘림(1×1·0 크기+overflow:hidden, clip:rect(0 0 0 0), clip-path inset(100%)·circle(0), transform:scale(0), max-height 0+overflow hidden) **+** 요소 텍스트에 가중치 2.0 이상 키워드, 또는 같은 범주 키워드 합 3.0 이상(슬롯 1.5+카지노 1.5), 또는 난독화와 겹치면 1.0 이상, 또는 중위 키워드(≥1.5) 1개 + 광고 유도 보조어(무료·체험·가입·쿠폰·코드·바로가기·입장·%…) 공존이면서 정상·행정 문맥어가 전혀 없음(조정안 A, 요강 예시 f_004 꼴; 숨긴 탭의 "카지노 관광 안내"는 문맥어로 제외) |
 | TRANSPARENT | color 가 배경색(요소 자신의 background(-color) → 없으면 가장 가까운 조상 → 기본 흰색)과 같거나 채널별 차이 ≤10(가장 가까운 조상 배경색·bgcolor, 기본 흰색; 배경 이미지·그라데이션만 있으면 판정 안 함) / color:transparent·알파 ≤0.05(rgba/hsla/#rrggbbaa) / opacity ≤0.05 **+** 위와 같은 키워드 조건 |
 | HOMOGLYPH | (a) 전각·키릴·그리스·라틴확장·leet(0/1/3/4/5/7/8/9/@/$, 1은 l·i 두 가지로) 유사문자를 치환해야 사전 키워드가 맞음(평문 키워드 없어도 됨) (b) **스크립트 혼용 토큰**(한 단어 안에 키릴·그리스·체로키·아르메니아·스몰캡 + 라틴/한글/숫자, 라틴 글자 사이 숫자·기호(leet), 전각 영문자)을 confusables 골격으로 되돌린 문자열에 사전 키워드 또는 영문 도박어(casino/toto/slot/bet/poker/jackpot/win…)가 있음 — 위장 자체가 1급 신호. 전각만인 토큰(ＷＩＮ－ＷＩＮ, IME 입력)은 가중치 ≥2 단어만, 가장자리 기호(@vip, $10)·끝 숫자(covid19)는 혼용으로 안 봄 (c) 평문 키워드(≥2)와 전각 문자/스크립트 혼용이 같은 말단 요소에 공존 (d) **IDN 호모그래프**: 키워드(은닉 또는 평문, 같은 요소나 같은 블록)와 함께 있는 링크 href·텍스트의 도메인 레이블에 라틴과 키릴·그리스 문자가 섞임(ѕо.invalid, саsino-vip.com, punycode 디코딩 포함). 호스트 전체가 한 스크립트(москва.рф)·한글 IDN(행복시.한국)은 제외. 위치는 그 도메인을 품은 요소(링크면 a). 문장 전체가 키릴인 정상 러시아어는 해당 없음 |
 | JAMO | 분리 자모(호환 자모 ㅌㅗㅌㅗ, **첫가끝 조합형 U+1100~ = NFD 로 분해된 한글**, 반각 자모)를 합성해야 키워드가 맞거나(페이지 전체가 NFD 로 저장된 경우는 인코딩 특성으로 보고 NFC 로 되돌린 뒤 판정), **초성 축약**(ㅋㅈㄴ=카지노, ㅂㅋㄹ=바카라; 3자 이상은 단독, 2자(ㅌㅌ)는 흔한 채팅 축약 제외+사이트·가입·코드 등 문맥어 동반 시)이 맞거나, 평문 키워드(≥2)와 합성 가능한 자모가 공존. 초성 퀴즈·한글 교육 문맥(화이트리스트 ≤-3)에서는 초성 축약만으로는 인정하지 않음 |
@@ -118,7 +118,8 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
   R2 페이지 1개(키릴 전체·전각·leet·체로키로 위장한 영문 도박어 + 정상 러시아어·전각 약어·covid19 하드 네거티브).
   R2 OFFSCREEN 일반형 페이지 1개(뷰포트 밖 양수·부모 overflow 밖·clip-path/clip·1×1·scale(0)·max-height 0·hidden 속성 + 접힌 아코디언·sr-only·숨긴 메뉴 하드 네거티브).
   R3 버그 재현 페이지(B1 같은 요소 color=background 외부 CSS, B2 숨김 클래스+자모, B3 NFD, B4 IDN 호모그래프)와 이미지 배너 광고 페이지(무작위·회전 도메인·텔레그램 6개 + 정상 롤링 배너 5개).
-  4종 라벨 54개(중첩 2요소 포함), ETC 라벨 22개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
+  조정안 A 페이지(은닉+중위 키워드+보조어 3건, 숨긴 탭 '카지노 관광 안내'·'슬롯머신 규제 현황'·'체험 프로그램 안내'·접근성 숨김 함정 = 정상 문서로 등록).
+  4종 라벨 57개(중첩 2요소 포함), ETC 라벨 22개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
 - 채점은 요강 방식 그대로: result.json 의 (url, location, technique) 단위로, location 을 DOM 에서 해석해 라벨 요소와 같은지 비교.
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.

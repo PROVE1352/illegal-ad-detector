@@ -13,7 +13,8 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 from . import hidden as H
-from .keywords import CATEGORY_LABEL, LEVEL_PLAIN, admin_context_score, match_keywords_levels, match_whitelist
+from .keywords import (CATEGORY_LABEL, LEVEL_PLAIN, admin_context_score, inducement_words, match_keywords_levels,
+                       match_whitelist)
 from .links import analyze_link, find_urls_in_text, host_of, idn_homograph_hosts, is_same_site, is_trusted
 from .models import Finding, Page
 from .normalize import collapse_spaces, has_composable_jamo, has_homoglyph_chars
@@ -427,6 +428,11 @@ class PageAnalyzer:
             if tech not in f.techniques:
                 f.techniques.append(tech)
         cats, max_w = self._add_keywords(f, text, allow_whitelist=False)
+        # 숨긴 탭·아코디언의 정상 안내문(강원랜드 카지노 관광 안내, 슬롯머신 규제 현황)이 ETC 로 올라오지 않게 점수에는 정상 문맥 감점을 반영.
+        # 4종 판정 게이트(아래)는 이 감점과 무관하게 자체 규칙으로 정한다.
+        if cats:
+            for kw, w in match_whitelist(text)[:6]:
+                f.add("context.whitelist", f"정상 문맥 '{kw}'", w, "context")
         self._add_links(f, el, text)
         self._idn_homograph(f, el, text)
         untrusted = [u for u in f.links if not is_trusted(host_of(u))]
@@ -440,7 +446,12 @@ class PageAnalyzer:
         wl_total = sum(w for _, w in match_whitelist(text))
         obfuscated = "obfuscation" in f.techniques   # 숨김 + 난독화가 겹치면 약한 키워드(카지노 1.5)도 고의성이 충분
         cat_sum = max(cats.values()) if cats else 0.0
-        strong = max_w >= OFFICIAL_MIN_KEYWORD or cat_sum >= OFFICIAL_MIN_SUM or (obfuscated and max_w >= 1.0)
+        # 조정안 A: 은닉이 확정된 요소에서 중위 키워드(≥1.5) 하나뿐이라도 광고 유도 보조어(무료·체험·가입·쿠폰·바로가기…)가 함께 있고
+        # 행정·정상 문맥어가 전혀 없으면 광고로 본다(요강 예시 f_004 "무료 슬롯 체험 바로가기" 꼴). 숨긴 탭의 "카지노 관광 안내" 는 문맥어로 제외.
+        induced = (max_w >= 1.5 and bool(inducement_words(text)) and wl_total == 0 and admin_context_score(text, ADMIN_WINDOW) == 0)
+        if induced:
+            f.add("context.ad_inducement", "은닉 + 광고 유도 보조어 " + ", ".join(inducement_words(text)[:4]), 0.5, "keyword")
+        strong = max_w >= OFFICIAL_MIN_KEYWORD or cat_sum >= OFFICIAL_MIN_SUM or (obfuscated and max_w >= 1.0) or induced
         if cats and strong and not (wl_total <= -3 and max_w < 3):
             # 은닉 기법끼리 겹치면 지배적인 하나만(요강: finding 당 technique 1개). 난독화(JAMO/HOMOGLYPH)는
             # _obfuscation_pass 가 같은 location 에 따로 붙여 두 finding 이 된다(채점자가 어느 라벨을 붙였을지 모르므로 둘 다 제출).

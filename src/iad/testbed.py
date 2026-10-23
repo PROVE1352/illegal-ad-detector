@@ -399,6 +399,23 @@ class Site:
         for eid in bn:
             self.label("post/post_banner.html", eid, "ETC", "기타", extra="IMAGE_BANNER_AD")
 
+        # 조정안 A: 은닉 + 중위 키워드 1개 + 광고 유도 보조어 → 4종 / 하드 네거티브: 숨긴 탭 '카지노 관광 안내'·'슬롯머신 규제 현황'·접근성 숨김
+        a1, a2, a3 = (self.nid() for _ in range(3))
+        add("post/post_tabs.html", "관광 산업 동향 보고",
+            f'<p>행복시 관광 산업 동향을 안내합니다.</p>'
+            f'<div class="tabpane"><p>강원랜드 카지노 관광 안내 및 관람 수칙</p></div>'
+            f'<div class="tabpane"><p>슬롯머신 규제 현황 (사행산업통합감독위원회 자료)</p></div>'
+            f'<div class="tabpane"><p>카지노 체험 프로그램 안내 바로가기</p></div>'
+            f'<a class="sr-only" href="#content">본문 바로가기</a><span class="sr-only">주메뉴 바로가기</span>'
+            f'<span id="{a1}" style="display:none">{"슬롯 가입 쿠폰 지급" if not v else "토토 가입 코드 무료"}</span>'
+            f'<span id="{a2}" style="color:#fff">{"카지노 입장 코드 777" if not v else "바카라 실시간 입장 보너스"}</span>'
+            f'<span id="{a3}" class="visually-hidden">{"무료 슬롯 체험 바로가기" if not v else "무료 포커 체험 접속"}</span>',
+            ["감사합니다"], head='<link rel="stylesheet" href="../css/site.css"><style>.visually-hidden{position:absolute;left:-9999px}</style>')
+        self.label("post/post_tabs.html", a1, "OFFSCREEN", "도박")
+        self.label("post/post_tabs.html", a2, "TRANSPARENT", "도박")
+        self.label("post/post_tabs.html", a3, "OFFSCREEN", "도박")
+        self.decoys.append("post/post_tabs.html")
+
         # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
         k1 = self.nid()
         normal_body = "<p>시민 제안 공모를 안내합니다. 접수: 10/20~11/5</p>"

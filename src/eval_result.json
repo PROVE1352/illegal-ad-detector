@@ -1,6 +1,6 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 12:52:57",
+  "timestamp": "2026-10-23 13:17:43",
   "depth": 3,
   "max_pages": 300,
   "port": 8765
@@ -9,13 +9,13 @@
   {
    "set": "dev",
    "entry_url": "http://127.0.0.1:8765/dev/index.html",
-   "pages_crawled": 32,
+   "pages_crawled": 33,
    "elapsed_sec": 0.26,
-   "tool_elapsed_sec": 0.252051,
+   "tool_elapsed_sec": 0.25222,
    "official": {
-    "gold": 54,
-    "reported_units": 54,
-    "tp": 54,
+    "gold": 57,
+    "reported_units": 57,
+    "tp": 57,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
@@ -32,13 +32,13 @@
       "recall": 1.0
      },
      "TRANSPARENT": {
-      "gold": 12,
-      "hit": 12,
+      "gold": 13,
+      "hit": 13,
       "recall": 1.0
      },
      "OFFSCREEN": {
-      "gold": 21,
-      "hit": 21,
+      "gold": 23,
+      "hit": 23,
       "recall": 1.0
      }
     },
@@ -55,18 +55,18 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_a9mrwi_6"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_i2hs0g9q"
   },
   {
    "set": "holdout",
    "entry_url": "http://127.0.0.1:8765/holdout/index.html",
-   "pages_crawled": 32,
-   "elapsed_sec": 0.18,
-   "tool_elapsed_sec": 0.175915,
+   "pages_crawled": 33,
+   "elapsed_sec": 0.2,
+   "tool_elapsed_sec": 0.18934,
    "official": {
-    "gold": 54,
-    "reported_units": 54,
-    "tp": 54,
+    "gold": 57,
+    "reported_units": 57,
+    "tp": 57,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
@@ -83,13 +83,13 @@
       "recall": 1.0
      },
      "TRANSPARENT": {
-      "gold": 12,
-      "hit": 12,
+      "gold": 13,
+      "hit": 13,
       "recall": 1.0
      },
      "OFFSCREEN": {
-      "gold": 21,
-      "hit": 21,
+      "gold": 23,
+      "hit": 23,
       "recall": 1.0
      }
     },
@@ -106,7 +106,7 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_2hhw8ta3"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_d5oa8nct"
   }
  ]
 }

@@ -709,3 +709,27 @@ def test_self_background_transparent_with_weak_keyword_pair():
 def test_self_background_negatives(html):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
     assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+# ---------- 조정안 A: 은닉 + 중위 키워드 + 광고 유도 보조어 ----------
+@pytest.mark.parametrize("html,code", [
+    ('<span class="hidden-link" style="position:absolute;left:-9999px">무료 슬롯 체험 바로가기</span>', "OFFSCREEN"),
+    ('<span style="display:none">슬롯 가입 쿠폰 지급</span>', "OFFSCREEN"),
+    ('<span style="color:#fff">카지노 입장 코드 777</span>', "TRANSPARENT"),
+    ('<span style="font-size:0">토토 추천 주소</span>', "OFFSCREEN"),
+    ('<span style="opacity:0">포커 실시간 배당</span>', "TRANSPARENT"),
+])
+def test_inducement_gate_positive(html, code):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert code in {c for f in fs for c in f.official}, [(f.location, f.official, f.score) for f in fs]
+
+
+@pytest.mark.parametrize("html", [
+    '<div style="display:none">강원랜드 카지노 관광 안내</div>', '<div style="display:none">슬롯머신 규제 현황</div>',
+    '<div style="display:none">카지노 체험 프로그램 안내 바로가기</div>', '<div style="display:none">카지노 관련 정책 토론회 참가 신청 바로가기</div>',
+    '<a class="skip" style="position:absolute;left:-9999px" href="#c">본문 바로가기</a>', '<span style="display:none">주메뉴 바로가기</span>',
+    '<div style="display:none">도박 예방 교육 무료 체험 프로그램 1336</div>', '<p>슬롯 가입 쿠폰 지급</p>',   # 평문은 게이트 대상 아님
+])
+def test_inducement_gate_negative(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert not any(f.official for f in fs), [(f.location, f.official, f.score) for f in fs]
