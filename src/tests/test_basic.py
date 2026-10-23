@@ -81,7 +81,7 @@ def test_location_rule():
     soup = BeautifulSoup(html, "lxml")
     a2 = soup.find_all("a")[1]
     loc = location_of(a2, soup)
-    assert loc == "div.notice-board > table.board-list > tr:nth-of-type(2) > td.title > a"
+    assert loc == "div.notice-board > table.board-list tr:nth-of-type(2) > td.title > a"
     assert soup.select(loc)[0] is a2
     span = soup.find("span")
     assert location_of(span, soup) == "div.notice-board > p:nth-of-type(2) > span"
@@ -134,6 +134,27 @@ def test_fixture_file_end_to_end():
             assert len(els) == 1
             got.add(els[0].get("id"))
     assert want <= got
+
+
+@pytest.mark.parametrize("html", [
+    '<p>불법 토토사이트 신고 기간（10.1～10.15）</p>',             # 전각 구두점만으로 HOMOGLYPH 되면 안 됨
+    '<p>문의 02-7070-1234</p>',                                     # 전화번호가 toto 로 읽히면 안 됨
+    '<div style="display:none">강원랜드 카지노 관광 안내 캠페인</div>',  # 숨긴 탭 안 정상 안내
+    '<font size="1" color="#000">작은 글씨 바카라 안내</font>',       # font size=1 은 1px 아님
+])
+def test_no_official_false_positive(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+def test_table_tr_descendant_combinator():
+    soup = BeautifulSoup('<html><body><table class="b"><tr><td>a</td></tr><tr><td class="t">b</td></tr></table></body></html>', "lxml")
+    td = soup.find("td", class_="t")
+    loc = location_of(td, soup)
+    assert loc == "table.b tr:nth-of-type(2) > td.t"
+    assert soup.select(loc)[0] is td
+    with_tbody = BeautifulSoup('<html><body><table class="b"><tbody><tr><td>a</td></tr><tr><td class="t">b</td></tr></tbody></table></body></html>', "lxml")
+    assert with_tbody.select(loc)[0].get_text() == "b"
 
 
 def test_euc_kr_decode():

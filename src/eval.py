@@ -22,6 +22,13 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 HERE = Path(__file__).resolve().parent
+try:
+    import bs4, lxml, requests  # noqa: F401,E401
+except ImportError:  # 프로젝트 루트에서 `uv run python src/eval.py` 로 실행된 경우 src/ 의 환경으로 재실행
+    import os
+    import shutil
+    uv = shutil.which("uv") or os.path.expanduser("~/.local/bin/uv")
+    os.execv(uv, ["uv", "run", "--project", str(HERE), "python", __file__, *sys.argv[1:]])
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE / "fixtures"))
 

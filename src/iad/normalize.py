@@ -71,11 +71,25 @@ def level_jamo(text: str) -> str:
     return compose_jamo(level_plain(text))
 
 
+_DIGIT_HOMO = {"0", "1", "3", "4", "5", "7"}
+_ALNUM_RUN = re.compile(r"[0-9a-z@$|\u0400-\u04ff\u0370-\u03ff]+")
+
+
+def _map_homoglyphs(t: str) -> str:
+    """숫자→문자 치환은 라틴 문자가 섞인 토큰 안에서만(전화번호 '7070' 이 'toto' 가 되는 것 방지)."""
+    def repl(m: re.Match) -> str:
+        tok = m.group(0)
+        if any("a" <= c <= "z" for c in tok):
+            return "".join(HOMOGLYPHS.get(c, c) for c in tok)
+        return "".join(HOMOGLYPHS.get(c, c) if c not in _DIGIT_HOMO else c for c in tok)
+    return _ALNUM_RUN.sub(repl, t)
+
+
 def level_homoglyph(text: str) -> str:
     """plain + NFKC(전각·호환문자) + 유사문자 치환(HOMOGLYPH 판정용)."""
     t = _nfkc_keep_jamo(level_plain(text))
     t = _strip_noise(t.lower())
-    return "".join(HOMOGLYPHS.get(ch, ch) for ch in t)
+    return _map_homoglyphs(t)
 
 
 def _nfkc_keep_jamo(t: str) -> str:
@@ -103,14 +117,14 @@ def aggressive(text: str) -> str:
     """키워드 탐지용 최대 정규화: 자모 합성 → NFKC → 유사문자 치환."""
     t = unicodedata.normalize("NFKC", level_jamo(text))
     t = _strip_noise(t.lower())
-    return "".join(HOMOGLYPHS.get(ch, ch) for ch in t)
+    return _map_homoglyphs(t)
 
 
 def collapse_spaces(text: str) -> str:
     return re.sub(r"\s+", " ", basic(text)).strip()
 
 
-_FULLWIDTH = re.compile("[\uff01-\uff5e\uff61-\uff9f]")
+_FULLWIDTH = re.compile("[\uff10-\uff19\uff21-\uff3a\uff41-\uff5a]")
 _CYRILLIC_GREEK = re.compile("[\u0400-\u04ff\u0370-\u03ff]")
 _LATIN = re.compile("[a-zA-Z]")
 _HANGUL = re.compile("[\uac00-\ud7a3]")

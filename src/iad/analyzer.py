@@ -39,7 +39,7 @@ OFFICIAL_MAP = {
 }
 THRESHOLD = 3.0
 MASS_LINK_MIN = 5
-OFFICIAL_MIN_KEYWORD = 1.5   # 4종에 넣기 위한 최소 키워드 가중치(오탐이 정확도 감점이므로 보수적으로)
+OFFICIAL_MIN_KEYWORD = 2.0   # 4종에 넣기 위한 최소 키워드 가중치(오탐이 정확도 감점이므로 보수적으로)
 
 
 # ---------- 위치(요강 규칙) ----------
@@ -66,7 +66,16 @@ def location_of(el: Tag, soup: BeautifulSoup | None = None) -> str:
     while cur is not None and isinstance(cur, Tag) and cur.name not in ("[document]", "html", "body"):
         parts.append(_segment(cur))
         cur = cur.parent if isinstance(cur.parent, Tag) else None
-    path = " > ".join(reversed(parts))
+    segs = list(reversed(parts))
+    path = ""
+    for i, seg in enumerate(segs):
+        if i == 0:
+            path = seg
+            continue
+        prev = segs[i - 1]
+        # 원본에 tbody 가 없는 table > tr 은 브라우저 DOM 에서 tbody 가 끼므로 자손 결합자(공백)로 적는다(두 DOM 모두에서 같은 요소)
+        comb = " " if (prev.split(".")[0].split(":")[0] == "table" and seg.split(".")[0].split(":")[0] == "tr") else " > "
+        path += comb + seg
     if not path:
         return el.name
     if soup is not None:
@@ -379,8 +388,10 @@ class PageAnalyzer:
         self._add_links(f, el, text)
         if f.links and not f.has_group("keyword"):
             f.add("link.hidden_external", "숨긴 요소 안의 외부 링크", 1.5, "link")
-        # 요강 4종 판정: 숨김 기법이 4종에 해당하고 불법 키워드가 충분히 강할 때만
-        if cats and max_w >= OFFICIAL_MIN_KEYWORD:
+        # 요강 4종 판정: 숨김 기법이 4종에 해당하고 불법 키워드가 충분히 강할 때만.
+        # 숨긴 탭/아코디언 안의 정상 안내문(카지노 관광 안내 등)은 화이트리스트 문맥이 강하면 제외.
+        wl_total = sum(w for _, w in match_whitelist(text))
+        if cats and max_w >= OFFICIAL_MIN_KEYWORD and not (wl_total <= -3 and max_w < 3):
             for tech, _ in techs:
                 code = OFFICIAL_MAP.get(tech)
                 if code and code not in f.official:
@@ -442,6 +453,9 @@ class PageAnalyzer:
     def _obfuscation_pass(self) -> None:
         """HOMOGLYPH/JAMO: 난독화 키워드를 품은 '가장 안쪽' 요소를 위치로 잡는다(숨김 여부 무관)."""
         body = self.soup.body or self.soup
+        whole = body.get_text(" ")
+        if not self._obf_codes(whole, leaf=True)[0]:
+            return  # 페이지 전체에 난독화 단서가 없으면 요소 순회 생략(속도)
         for el in body.find_all(True):
             if el.name in SKIP_TAGS or el.name not in TEXT_TAGS:
                 continue

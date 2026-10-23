@@ -97,8 +97,6 @@ def effective_style(el: Tag, sheet: dict[int, dict[str, str]]) -> dict[str, str]
     st.update(parse_style(el.get("style")))
     # font 태그 속성
     if el.name == "font":
-        if el.get("size") in ("0", "1", "-2", "-3"):
-            st.setdefault("font-size", "1px")
         if el.get("color"):
             st.setdefault("color", str(el.get("color")))
     return st

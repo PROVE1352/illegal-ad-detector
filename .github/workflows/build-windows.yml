@@ -76,12 +76,20 @@ jobs:
           New-Item -ItemType Directory -Force -Path $kdir | Out-Null
           Copy-Item -Recurse -Force build/dist/IllegalAdDetector/* $kdir
           $out = Join-Path $env:RUNNER_TEMP "스모크 결과"
-          ./build/smoke_cli.ps1 -AppDir $kdir -FixturesDir src/fixtures -OutDir $out
-          if ($LASTEXITCODE -ne 0) { throw "CLI 스모크 실패" }
-          ./build/smoke_gui.ps1 -Exe (Join-Path $kdir "IllegalAdDetector.exe") -WorkDir (Join-Path $out "gui")
-          if ($LASTEXITCODE -ne 0) { throw "GUI 스모크 실패" }
-          New-Item -ItemType Directory -Force -Path build/smoke_out | Out-Null
-          Copy-Item -Recurse -Force "$out/*" build/smoke_out/
+          try {
+            ./build/smoke_cli.ps1 -AppDir $kdir -FixturesDir src/fixtures -OutDir $out
+            if ($LASTEXITCODE -ne 0) { throw "CLI 스모크 실패" }
+            ./build/smoke_gui.ps1 -Exe (Join-Path $kdir "IllegalAdDetector.exe") -WorkDir (Join-Path $out "gui")
+            if ($LASTEXITCODE -ne 0) { throw "GUI 스모크 실패" }
+          } finally {
+            # 실패해도 로그·result.json 을 smoke-output artifact 로 남긴다
+            New-Item -ItemType Directory -Force -Path build/smoke_out | Out-Null
+            if (Test-Path $out) { Copy-Item -Recurse -Force "$out/*" build/smoke_out/ }
+            foreach ($n in "result.json", "result_extra.json") {
+              $f = Join-Path $kdir $n
+              if (Test-Path -LiteralPath $f) { Copy-Item -LiteralPath $f -Destination build/smoke_out/ -Force }
+            }
+          }
 
       - name: 산출물 zip
         if: steps.check.outputs.ready == 'true'
