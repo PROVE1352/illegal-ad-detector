@@ -56,6 +56,7 @@ MASS_LINK_MIN = 5
 ADMIN_WINDOW = 100          # 행정 문맥 판정 창(키워드 주변 ±자)
 ADMIN_EXCLUDE = -2.0        # 창 안 행정 문맥 점수가 이 이하이고 의심 링크·은닉·난독화가 없으면 안내문으로 보고 제외
 OFFICIAL_MIN_KEYWORD = 2.0   # 4종에 넣기 위한 최소 키워드 가중치(오탐이 정확도 감점이므로 보수적으로)
+OFFICIAL_MIN_SUM = 3.0       # 단일 키워드가 약해도(슬롯 1.5 + 카지노 1.5) 같은 범주 합이 이 값 이상이면 4종 게이트 통과
 
 
 # ---------- 위치(요강 규칙) ----------
@@ -438,7 +439,8 @@ class PageAnalyzer:
         # 숨긴 탭/아코디언 안의 정상 안내문(카지노 관광 안내 등)은 화이트리스트 문맥이 강하면 제외.
         wl_total = sum(w for _, w in match_whitelist(text))
         obfuscated = "obfuscation" in f.techniques   # 숨김 + 난독화가 겹치면 약한 키워드(카지노 1.5)도 고의성이 충분
-        strong = max_w >= OFFICIAL_MIN_KEYWORD or (obfuscated and max_w >= 1.0)
+        cat_sum = max(cats.values()) if cats else 0.0
+        strong = max_w >= OFFICIAL_MIN_KEYWORD or cat_sum >= OFFICIAL_MIN_SUM or (obfuscated and max_w >= 1.0)
         if cats and strong and not (wl_total <= -3 and max_w < 3):
             # 은닉 기법끼리 겹치면 지배적인 하나만(요강: finding 당 technique 1개). 난독화(JAMO/HOMOGLYPH)는
             # _obfuscation_pass 가 같은 location 에 따로 붙여 두 finding 이 된다(채점자가 어느 라벨을 붙였을지 모르므로 둘 다 제출).

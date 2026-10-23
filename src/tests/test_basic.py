@@ -684,3 +684,28 @@ def test_image_banner_ad_detected(html):
 def test_image_banner_normal_not_reported(html):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
     assert not fs, [(f.location, f.extra_names, f.score) for f in fs]
+
+
+# ---------- B6: 요소 자신의 background = color (외부 CSS) + 약한 키워드 2개 ----------
+def test_self_background_transparent_with_weak_keyword_pair():
+    from iad.crawler import Crawler, CrawlConfig
+    c = Crawler("http://ex.go.kr/board/view", CrawlConfig(allowed_hosts=()))
+    c.css_cache["http://ex.go.kr/assets/board.css"] = ".t-same{color:#ffffff;background:#ffffff;}"
+    html = '<html><head><link rel=stylesheet href=/assets/board.css></head><body><div class="article-body"><p>공고합니다.</p><span class="leak-t1 t-same">슬롯 카지노</span></div></body></html>'
+    page = Page(url="http://ex.go.kr/board/view", html=html)
+    page.css_texts = c.stylesheets(page, BeautifulSoup(html, "lxml"))
+    fs = analyze_page(page, "ex.go.kr")
+    hit = [f for f in fs if "TRANSPARENT" in f.official]
+    assert hit and hit[0].location == "div.article-body > span.leak-t1.t-same", [(f.location, f.official, f.extra_names) for f in fs]
+    assert any(o["technique"] == "TRANSPARENT" for o in build_official(fs))
+
+
+@pytest.mark.parametrize("html", [
+    '<style>.t-same{color:#fff;background:#fff}</style><span class="t-same">문의 안내 02-000-0000</span>',       # 키워드 없음
+    '<style>.t-same{color:#fff;background:#fff}</style><span class="t-same">강원랜드 카지노 관광 안내</span>',   # 약한 키워드 하나
+    '<style>.btn{background:#1e4fa3;color:#fff}.btn:hover{background:#fff;color:#1e4fa3}</style><a class="btn" href="/x">슬롯 예약 카지노 관광</a>',  # 반전 hover 는 의사클래스
+    '<div style="background:#fff"><p style="color:#222">슬롯 카지노 단속 안내</p></div>',                       # 흰 박스 안 일반 글자색
+])
+def test_self_background_negatives(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
