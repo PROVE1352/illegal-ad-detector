@@ -1105,3 +1105,31 @@ def test_browser_stage_dom_normalization_is_not_injection(tmp_path, monkeypatch)
     assert any("TRANSPARENT" in f.official for f in static_fs)
     out, note = B.browser_stage([page], static_fs, "ex.go.kr", lambda: 60.0, lambda m: None)
     assert out == [], [(f.location, f.extra_names, f.evidence_text) for f in out]
+
+
+# ---------- R8: GUI 최소 폭(820)에서 상단 라벨·체크박스가 잘리지 않는다 ----------
+def test_gui_labels_fit_at_min_width():
+    import tkinter as tk
+    import run_gui
+    try:
+        app = run_gui.App()
+    except tk.TclError as e:          # 디스플레이 없는 러너
+        pytest.skip(f"tk 디스플레이 없음: {e}")
+    try:
+        app.geometry("820x600")
+        for _ in range(3):
+            app.update_idletasks()
+            app.update()
+        top = app.winfo_children()[0]
+        bad = []
+        for frame in top.winfo_children():
+            if not frame.winfo_children():
+                continue
+            fw = frame.winfo_width()
+            for w in frame.winfo_children():
+                if w.winfo_x() + w.winfo_reqwidth() > fw + 1:
+                    bad.append((w.cget("text") if "text" in w.keys() else type(w).__name__, w.winfo_x(), w.winfo_reqwidth(), fw))
+        assert not bad, bad
+        assert app.static_note.cget("wraplength") > 40 if hasattr(app, "static_note") else True
+    finally:
+        app.destroy()

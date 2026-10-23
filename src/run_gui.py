@@ -23,6 +23,17 @@ from iad.scan import ScanResult, scan  # noqa: E402
 from iad.triage import area_of, contact_for, defang, fingerprint, guide_for, priority_of  # noqa: E402
 
 
+def _fit_wrap(label: ttk.Label, container: tk.Misc, pad: int = 8) -> None:
+    """라벨의 wraplength 를 고정 픽셀이 아니라 '들어 있는 프레임의 실제 폭 - 라벨 x 위치' 로 맞춘다(창 크기 바뀔 때마다 갱신).
+    긴 안내문이 창 오른쪽에서 잘리지 않고 줄바꿈된다."""
+    def _apply(_e=None) -> None:
+        width = container.winfo_width() - label.winfo_x() - pad
+        if width > 40:
+            label.configure(wraplength=width)
+    container.bind("<Configure>", _apply, add="+")
+    label.after_idle(_apply)
+
+
 class App(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -53,7 +64,9 @@ class App(tk.Tk):
         self.delay = tk.DoubleVar(value=0.3)
         ttk.Spinbox(top, from_=0, to=5, increment=0.1, textvariable=self.delay, width=5).grid(row=2, column=5, sticky="w")
         opts = ttk.Frame(top)
-        opts.grid(row=3, column=0, columnspan=6, sticky="w", pady=(6, 0))
+        opts.grid(row=3, column=0, columnspan=6, sticky="we", pady=(6, 0))
+        opts2 = ttk.Frame(top)   # 체크박스가 한 줄에 다 안 들어가므로(최소 폭 820) 두 줄로 나눈다
+        opts2.grid(row=4, column=0, columnspan=6, sticky="we", pady=(2, 0))
         self.robots = tk.BooleanVar(value=False)
         self.render = tk.BooleanVar(value=False)
         self.ext_iframe = tk.BooleanVar(value=True)
@@ -62,8 +75,8 @@ class App(tk.Tk):
         ttk.Checkbutton(opts, text="robots.txt 존중", variable=self.robots).pack(side="left", padx=4)
         ttk.Checkbutton(opts, text="외부 iframe 수집", variable=self.ext_iframe).pack(side="left", padx=4)
         ttk.Checkbutton(opts, text="클로킹 점검(봇 UA 재요청)", variable=self.cloak).pack(side="left", padx=4)
-        ttk.Checkbutton(opts, text="Edge JS 실행 비교(의심 스크립트 쪽만)", variable=self.browser).pack(side="left", padx=4)
-        self.render_cb = ttk.Checkbutton(opts, text="Edge 렌더 비교(선택, 느림)", variable=self.render)
+        ttk.Checkbutton(opts2, text="Edge JS 실행 비교(의심 스크립트 쪽만)", variable=self.browser).pack(side="left", padx=4)
+        self.render_cb = ttk.Checkbutton(opts2, text="Edge 렌더 비교(선택, 느림)", variable=self.render)
         self.render_cb.pack(side="left", padx=4)
         try:
             from iad.render import render_available
@@ -73,10 +86,11 @@ class App(tk.Tk):
         if static_only:   # 제출본은 playwright 없는 정적 빌드
             self.render.set(False)
             self.render_cb.configure(state="disabled")
-            ttk.Label(opts, text="(이 배포본은 정적 분석 전용 —\n렌더 비교 미포함)", foreground="#667", justify="left",
-                      wraplength=200).pack(side="left", padx=4)
+            self.static_note = ttk.Label(opts2, text="정적 분석 전용 배포본\nEdge 렌더 비교 미포함", foreground="#667", justify="left")
+            self.static_note.pack(side="left", padx=4)
+            _fit_wrap(self.static_note, opts2)
         btns = ttk.Frame(top)
-        btns.grid(row=4, column=0, columnspan=6, sticky="we", pady=(8, 0))
+        btns.grid(row=5, column=0, columnspan=6, sticky="we", pady=(8, 0))
         self.start_btn = ttk.Button(btns, text="탐지 시작", command=self.start)
         self.start_btn.pack(side="left")
         self.stop_btn = ttk.Button(btns, text="중단", command=self.stop, state="disabled")
@@ -87,8 +101,9 @@ class App(tk.Tk):
         self.folder_btn.pack(side="left", padx=6)
         self.demo_btn = ttk.Button(btns, text="데모 실행(내장 테스트 사이트)", command=self.start_demo)
         self.demo_btn.pack(side="left", padx=6)
-        self.status = ttk.Label(btns, text=f"결과 폴더: {run_dir()}")
+        self.status = ttk.Label(btns, text=f"결과 폴더: {run_dir()}", justify="left")
         self.status.pack(side="left", padx=12)
+        _fit_wrap(self.status, btns)
         top.columnconfigure(5, weight=1)
 
         nb = ttk.Notebook(self)
