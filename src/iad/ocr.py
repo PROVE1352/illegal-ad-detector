@@ -1,7 +1,7 @@
 """이미지 배너 글자 OCR 단계(Windows 전용, ETC `IMAGE_TEXT_AD`): Windows 내장 OCR(Windows.Media.Ocr)을 Windows PowerShell 5.1 로 호출한다(추가 번들 0).
 
 - 대상: 텍스트 없는 `<a><img></a>` 배너, alt/title 에 배너·광고·이벤트가 있는 img, IMAGE_BANNER_AD 후보 이미지(동일 사이트·외부 모두, data: URI 포함).
-  이미지당 2MB·png/jpg/gif(첫 프레임)/bmp, 전체 40개, 이미지당 10초, 단계 120초, 남은 전체 시간 예산 안에서만.
+  이미지당 2MB·png/jpg/gif(첫 프레임)/bmp, 전체 40개, 이미지당 10초, 단계 60초, 남은 전체 시간 예산 안에서만.
 - 한 번의 powershell 호출로 여러 이미지를 일괄 처리(프로세스 기동 비용 1회). 스크립트는 UTF-16LE base64 `-EncodedCommand`(BOM·코드페이지 문제 회피),
   출력은 [Console]::OutputEncoding=UTF-8 로 받아 한 이미지당 JSON 한 줄. 언어는 ko → 사용자 프로필 언어 → en-US 순, 엔진이 없으면 생략.
   MaxImageDimension 을 넘는 이미지는 BitmapTransform 으로 축소해 인식한다.
@@ -32,7 +32,7 @@ from .models import Finding, Page
 
 MAX_IMAGES = 40
 MAX_IMAGE_BYTES = 2_000_000
-STAGE_BUDGET = 120.0
+STAGE_BUDGET = 60.0
 PER_IMAGE_SEC = 10.0
 MIN_KEYWORD = 2.0
 MIN_SUM = 3.0

@@ -132,6 +132,11 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 - 채점은 요강 방식 그대로: result.json 의 (url, location, technique) 단위로, location 을 DOM 에서 해석해 라벨 요소와 같은지 비교.
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.
+- **검출 시간 보호(R11)**: 공식 4종 수집·분석이 끝나면 그 시점에 result.json 을 확정 기록한다(meta.finished_at·elapsed_sec = 그 시점).
+  이후 클로킹 재요청(40쪽 유지 — 20쪽이면 내장 테스트베드의 클로킹 페이지가 상한 밖으로 밀려 ETC 재현율 22→21 로 떨어진다; result.json 확정 뒤라 검출 시간엔 영향 없음, 디렉터리 라운드로빈으로 선정)·Edge 브라우저 단계(90초, 쪽당 10초)·OCR 단계(60초)는 모두 ETC 전용이라 result.json 의 findings 를 바꾸지 않으므로
+  result_extra.json 과 리포트만 갱신한다(result.json 의 시간 메타는 사실과 일치하고, 검출 시간 점수가 보조 단계에 깎이지 않는다).
+- **결과 파일 쓰기 폴백(R11)**: 결과 폴더(기본 exe 폴더)에 쓰기 시험(임시 파일 생성·삭제)을 해서 실패하면 현재 작업 폴더 → %LOCALAPPDATA%\\IllegalAdDetector
+  (없으면 홈/IllegalAdDetector) 순으로 바꾸고 실제 경로를 로그·GUI 상태줄에 안내한다. 도중에 쓰기가 실패해도 폴백으로 한 번 더 시도하고, 전혀 못 써도 스캔은 죽지 않는다.
 - **실사이트 정상 세트** `fixtures/realworld/`(행안부 게시판 10쪽 + 외부 CSS 9개, 공개 페이지를 1초 간격으로 1회 수집, manifest.json):
   오프라인으로 분석해 4종 0건 · ETC ≤9 · 쪽당 CPU ≤1.0s(맥 실측 0.22s, Windows CI 러너 편차 감안) 를 통과 조건으로 EVAL_RESULT.md 에 PASS/FAIL 을 적는다(정상 공공 사이트 잡음 회귀 방지).
 
@@ -142,7 +147,7 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 짧은 키워드(영문 ≤8자, 한글 ≤2자)는 JSON/CSS/JS 의 따옴표·괄호·콜론 경계를 넘어 이어 붙은 우연한 일치("s1":"ot"→slot)를 세지 않는다.
 
 브라우저 단계(P1-2, 기본 켬, `--no-browser`/GUI 체크로 끔): OS 에 이미 설치된 Edge/Chrome 을 `--headless=new --dump-dom --virtual-time-budget=5000`
-으로 띄워(추가 의존성 없음, 임시 프로필, 페이지당 15초·단계 5분·남은 시간 예산 안) 인라인 스크립트에 document.write/innerHTML/appendChild/
+으로 띄워(추가 의존성 없음, 임시 프로필, 페이지당 10초·단계 90초·남은 시간 예산 안) 인라인 스크립트에 document.write/innerHTML/appendChild/
 eval/atob 등 DOM 주입 흔적이 있는 최상위 페이지(최대 30쪽)만 JS 실행 후 DOM 을 한 번 더 분석한다. **정적 HTML 에 없던 요소만 ETC `DYNAMIC_INJECTION` 으로 result_extra 에 넣고 result.json 에는 넣지 않는다**(선택자가 정적 DOM 에서
 풀리면 그 요소의 내용으로, 안 풀리면 — Chrome 의 `<tbody>` 삽입·중첩 수선으로 경로가 달라질 수 있으므로 — 정적 HTML 원문·텍스트에 근거 문장과 링크가
 있는지로 '이미 있던 것'을 가려내고, 숨긴 메뉴의 외부 링크만으로는 올리지 않는다; 실사이트 10쪽은 전부 의심 스크립트 대상이었고 Chrome 으로 돌려 추가 0건, 쪽당 1.5초) — 채점자의 location 은 수집한 HTML 기준으로 풀릴
@@ -154,7 +159,7 @@ Program Files·LOCALAPPDATA 표준 경로 → PATH. 정책 HeadlessModeEnabled=0
 이미지 배너 OCR(R10, Windows 전용·기본 켬, `--no-ocr`/GUI 'OCR(이미지 글자)'): Windows 내장 OCR(Windows.Media.Ocr)을 Windows PowerShell 5.1
 (`-NoProfile -NonInteractive -EncodedCommand`, 스크립트는 UTF-16LE base64, 출력은 UTF-8 JSON 한 줄/이미지)로 호출한다(번들 0, pwsh 7 은 WinRT 없어 불가).
 언어는 ko → 사용자 프로필 언어 → en-US, 엔진이 없으면 생략. 대상은 텍스트 없는 `<a><img></a>` 배너와 alt/title 에 배너·광고·이벤트가 있는 img
-(동일 사이트·외부·data: URI 모두, 2MB·png/jpg/gif/bmp, MaxImageDimension 초과는 축소), 이미지 40개·이미지당 10초·단계 120초·전체 예산 안,
+(동일 사이트·외부·data: URI 모두, 2MB·png/jpg/gif/bmp, MaxImageDimension 초과는 축소), 이미지 40개·이미지당 10초·단계 60초·전체 예산 안,
 한 번의 powershell 호출로 일괄 처리. OCR 글자를 기존 사전으로 판정해(키워드 ≥2.0 또는 범주 합 ≥3.0, 행정 문맥 제외) **ETC `IMAGE_TEXT_AD` 로만**
 보고한다(OCR 오인식·캠페인 배너 위험, 이미지 글자는 4종 기법이 아님). Windows 가 아니거나 실패·타임아웃이면 한 줄 경고 후 정적 결과. 데모(post_banner)에
 한글 도박 문구 배너 PNG 와 정상 캠페인 배너 PNG 를 내장했고 라벨은 `platform: win32` 로 Windows 에서만 채점한다. 맥에서는 가짜 실행기로 명령·인코딩·

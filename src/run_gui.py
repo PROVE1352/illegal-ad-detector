@@ -174,7 +174,7 @@ class App(tk.Tk):
         self.tree.delete(*self.tree.get_children())
         cfg = CrawlConfig(depth=self.depth.get(), max_pages=self.max_pages.get(), delay=self.delay.get(),
                           respect_robots=self.robots.get(), follow_external_iframes=self.ext_iframe.get(),
-                          cloak_pages=20 if self.cloak.get() else 0, browser=self.browser.get(), ocr=self.ocr.get())
+                          cloak_pages=40 if self.cloak.get() else 0, browser=self.browser.get(), ocr=self.ocr.get())
         render = self.render.get()
 
         def work() -> None:

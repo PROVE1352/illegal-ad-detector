@@ -40,16 +40,17 @@ def check_cloaking(crawler: Crawler, pages: list[Page], normal_findings: list[Fi
     out: list[Finding] = []
     cands = [p for p in pages if p.html and not p.error and not p.is_iframe and not p.external]
     # 우선순위: 진입 페이지 → 경로(디렉터리)별 첫 페이지(템플릿 단위 변조를 넓게 훑음) → 나머지 수집 순서
-    seen_dirs: set[str] = set()
-    first: list[Page] = []
-    rest: list[Page] = []
+    # 나머지는 디렉터리별로 돌아가며(라운드로빈) 골라 한 게시판이 상한(기본 20쪽)을 독차지하지 않게 한다
+    by_dir: dict[str, list[Page]] = {}
     for p in cands:
-        d = p.url.split("?", 1)[0].rsplit("/", 1)[0]
-        if d not in seen_dirs:
-            seen_dirs.add(d)
-            first.append(p)
-        else:
-            rest.append(p)
+        by_dir.setdefault(p.url.split("?", 1)[0].rsplit("/", 1)[0], []).append(p)
+    queues = list(by_dir.values())
+    first = [q.pop(0) for q in queues]
+    rest: list[Page] = []
+    while any(queues):
+        for q in queues:
+            if q:
+                rest.append(q.pop(0))
     targets = (first + rest)[:max_pages]
     if not targets:
         return out

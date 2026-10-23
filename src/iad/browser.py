@@ -5,7 +5,7 @@
 - 결과: 정적 DOM 에 없던(선택자가 안 풀리거나 내용이 달라진) finding 만 **ETC(DYNAMIC_INJECTION)** 로 추가한다. 채점자의 location 은 수집한 HTML
   기준으로 풀릴 가능성이 높으므로 렌더 후에만 존재하는 요소를 4종(result.json)에 넣지 않는다(정확도 보호).
 - 안전장치: 브라우저가 없거나(None), 정책(HKLM/HKCU Policies\\Microsoft\\Edge HeadlessModeEnabled=0)으로 막혔거나, 호출이 실패·타임아웃이면
-  정적 결과만 남긴다. 페이지당 15초, 단계 전체 5분 상한, 남은 전체 시간 예산 안에서만 돈다. 호출마다 임시 프로필을 쓰고 끝나면 지운다.
+  정적 결과만 남긴다. 페이지당 10초, 단계 전체 90초 상한, 남은 전체 시간 예산 안에서만 돈다. 호출마다 임시 프로필을 쓰고 끝나면 지운다.
 - 추가 의존성 없음(subprocess 만). Windows 실측은 하지 않았으므로 "실패하면 정적 결과만" 구조를 유지한다.
 """
 from __future__ import annotations
@@ -24,8 +24,8 @@ from bs4 import BeautifulSoup
 
 from .models import Finding, Page
 
-PER_PAGE_TIMEOUT = 15.0
-STAGE_BUDGET = 300.0
+PER_PAGE_TIMEOUT = 10.0
+STAGE_BUDGET = 90.0
 MAX_PAGES = 30
 VIRTUAL_TIME_MS = 5000
 MAX_DOM_BYTES = 3_000_000
