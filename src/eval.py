@@ -11,13 +11,9 @@ from __future__ import annotations
 
 import json
 import re
-import socket
 import sys
 import tempfile
-import threading
 import time
-from functools import partial
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -34,48 +30,12 @@ sys.path.insert(0, str(HERE / "fixtures"))
 
 from bs4 import BeautifulSoup  # noqa: E402
 
-from gen_fixtures import generate  # noqa: E402
+from gen_fixtures import generate, pick_port, serve  # noqa: E402
 from iad.crawler import CrawlConfig  # noqa: E402
 from iad.scan import scan  # noqa: E402
 
 FIXTURES = HERE / "fixtures"
 OFFICIAL = ("HOMOGLYPH", "JAMO", "TRANSPARENT", "OFFSCREEN")
-
-
-class QuietHandler(SimpleHTTPRequestHandler):
-    """정적 서버. 클로킹 흉내: 같은 경로에 '.bot' 파일이 있고 요청이 검색엔진 봇 UA 또는 네이버 검색 Referer 면 그 파일을 준다."""
-
-    def log_message(self, *a) -> None:  # noqa: D102
-        pass
-
-    def translate_path(self, path: str) -> str:
-        real = super().translate_path(path)
-        ua = self.headers.get("User-Agent", "")
-        ref = self.headers.get("Referer", "")
-        if (re.search(r"Yeti|Googlebot|bingbot", ua) or "search.naver.com" in ref) and Path(real + ".bot").is_file():
-            return real + ".bot"
-        return real
-
-    def guess_type(self, path):  # cp949 파일은 charset 헤더 없이 (meta 로 판정하게); .bot 변형은 HTML 로
-        if str(path).endswith(".bot"):
-            return "text/html"
-        return super().guess_type(path)
-
-
-def pick_port(preferred: int) -> int:
-    with socket.socket() as s:
-        try:
-            s.bind(("127.0.0.1", preferred))
-            return preferred
-        except OSError:
-            s.bind(("127.0.0.1", 0))
-            return s.getsockname()[1]
-
-
-def serve(root: Path, port: int) -> ThreadingHTTPServer:
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), partial(QuietHandler, directory=str(root)))
-    threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    return httpd
 
 
 # ---------- location 해석 ----------

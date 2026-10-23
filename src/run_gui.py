@@ -71,6 +71,8 @@ class App(tk.Tk):
         self.open_btn.pack(side="left", padx=6)
         self.folder_btn = ttk.Button(btns, text="결과 폴더 열기", command=self.open_folder)
         self.folder_btn.pack(side="left", padx=6)
+        self.demo_btn = ttk.Button(btns, text="데모 실행(내장 테스트 사이트)", command=self.start_demo)
+        self.demo_btn.pack(side="left", padx=6)
         self.status = ttk.Label(btns, text=f"결과 폴더: {run_dir()}")
         self.status.pack(side="left", padx=12)
         top.columnconfigure(5, weight=1)
@@ -134,6 +136,28 @@ class App(tk.Tk):
         self.worker = threading.Thread(target=work, daemon=True)
         self.worker.start()
 
+    def start_demo(self) -> None:
+        """내장 테스트베드를 로컬(127.0.0.1)에 띄워 스캔하고 리포트를 연다. 결과는 구동 폴더/demo 에 쓴다."""
+        from iad.demo import run_demo
+        self.stop_requested = False
+        self.start_btn.configure(state="disabled")
+        self.demo_btn.configure(state="disabled")
+        self.stop_btn.configure(state="normal")
+        self.open_btn.configure(state="disabled")
+        self.tree.delete(*self.tree.get_children())
+        self.nb.select(0)
+
+        def work() -> None:
+            last = None
+            try:
+                last = run_demo(log=self.log, stop_flag=lambda: self.stop_requested)
+            except Exception as e:
+                self.log(f"데모 오류: {e!r}")
+            self.q.put(("done", last))
+
+        self.worker = threading.Thread(target=work, daemon=True)
+        self.worker.start()
+
     def stop(self) -> None:
         self.stop_requested = True
         self.log("중단 요청… 현재 페이지까지 처리 후 결과 파일을 생성합니다.")
@@ -155,6 +179,7 @@ class App(tk.Tk):
 
     def _finish(self, res: ScanResult | None) -> None:
         self.start_btn.configure(state="normal")
+        self.demo_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled")
         self.result = res
         if res is None:

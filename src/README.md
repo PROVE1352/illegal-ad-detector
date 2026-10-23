@@ -31,7 +31,9 @@ src/
     official.py       요강 붙임4 스키마 result.json / result_extra.json 작성
     report.py         자체완결 HTML 리포트(필터·정렬·근거 펼치기) + CSV + JSON
     render.py         선택: playwright channel="msedge" 로 정적 DOM vs 렌더 DOM 차이(동적 주입)·요소 스크린샷
-  fixtures/           하네스용 가짜 공공기관 사이트(gen_fixtures.py 가 dev/, holdout/, labels.json 을 생성)
+    testbed.py        내장 테스트베드: 가짜 공공기관 사이트 생성기(dev/holdout + labels.json) + 로컬 서버(클로킹 .bot 응답 포함)
+    demo.py           --demo: 테스트베드를 임시 폴더에 생성·127.0.0.1 로 서빙 → 스캔 → 구동폴더/demo 에 결과·리포트 → 브라우저 열기
+  fixtures/           하네스용 가짜 공공기관 사이트(gen_fixtures.py 는 iad/testbed.py 의 얇은 래퍼; dev/, holdout/, labels.json 생성)
   eval.py             로컬 http.server 로 fixtures 를 띄워 공식 채점 단위로 평가 → EVAL_RESULT.md, eval_result.json
   tests/              pytest
 ```
@@ -42,7 +44,8 @@ src/
 cd src
 ~/.local/bin/uv sync --extra dev            # Python 3.12, requests/beautifulsoup4/lxml(+pytest)
 uv run python -m iad --url https://www.example.go.kr/board/list --depth 3 --max-pages 300
-uv run python run_gui.py                    # GUI
+uv run python -m iad --demo                 # 내장 테스트베드 데모(네트워크 불필요, 결과는 ./demo/, 리포트 자동 열기)
+uv run python run_gui.py                    # GUI ("데모 실행" 버튼 = --demo)
 uv run python eval.py                       # 하네스 (프로젝트 루트에서는 uv run --project src python src/eval.py)
 uv run pytest -q
 ```
@@ -99,7 +102,8 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.
 
 ## 빌드 (PyInstaller, Windows)
-- 진입점 `src/run_gui.py` (CLI 는 `python -m iad`). 데이터 파일 없음(키워드 사전은 .py).
+- 진입점 `src/run_gui.py` (CLI 는 `python -m iad`). 데이터 파일 없음(키워드 사전은 .py, `--demo` 테스트 사이트도 `iad/testbed.py` 가
+  실행 시점에 임시 폴더에 생성하므로 `src/fixtures/` 를 번들할 필요 없음). `collect_submodules("iad")` 로 testbed/demo/cloak 모듈이 포함된다.
 - hidden imports: `lxml._elementpath`, `bs4.builder._lxml`, `soupsieve`, `requests`, `charset_normalizer`, `idna`,
   `urllib3`, `tkinter`, `tkinter.ttk`. playwright 는 번들하지 않아도 되며(없으면 자동 생략), 넣으려면 `--extra render`.
 - 예: `pyinstaller --noconfirm --onefile --windowed --name iad run_gui.py --collect-submodules lxml --hidden-import bs4.builder._lxml`

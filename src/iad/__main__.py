@@ -11,7 +11,9 @@ from .scan import scan
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="iad", description="공공 웹사이트 불법광고 탐지 도구")
-    p.add_argument("--url", required=True, help="진입 URL 1개")
+    p.add_argument("--url", default=None, help="진입 URL 1개")
+    p.add_argument("--demo", action="store_true", help="내장 테스트베드를 로컬에 띄워 스캔하고 리포트를 연다(네트워크 불필요)")
+    p.add_argument("--no-open", action="store_true", help="--demo 에서 브라우저 자동 열기 안 함")
     p.add_argument("--depth", type=int, default=3, help="탐색 깊이(기본 3)")
     p.add_argument("--max-pages", type=int, default=300, help="최대 페이지 수(기본 300)")
     p.add_argument("--delay", type=float, default=0.3, help="요청 간격 초(기본 0.3)")
@@ -29,7 +31,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.demo:
+        from .demo import run_demo
+        res = run_demo(log=(lambda m: None) if args.quiet else (lambda m: print(m, flush=True)),
+                       result_dir=Path(args.result_dir) if args.result_dir else None, open_browser=not args.no_open)
+        print(f"\n데모 완료: 페이지 {len(res.pages)}개, 탐지 {len(res.findings)}건, {res.elapsed:.1f}초\nreport: {res.report_html}")
+        return 0
+    if not args.url:
+        parser.error("--url 또는 --demo 가 필요합니다")
     cfg = CrawlConfig(depth=args.depth, max_pages=args.max_pages, delay=args.delay, timeout=args.timeout,
                       respect_robots=args.robots, follow_external_iframes=not args.no_external_iframe,
                       time_budget_sec=args.time_budget, cloak_pages=args.cloak_pages, fetch_css=not args.no_css)

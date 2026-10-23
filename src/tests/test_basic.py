@@ -367,3 +367,14 @@ def test_crawler_lazy_iframe_data_src():
     soup = BeautifulSoup('<html><body><iframe data-src="/w/x.html"></iframe><iframe src="about:blank" data-src="w/y.html"></iframe></body></html>', "lxml")
     srcs = [u for u, _ in c.extract_frames(Page(url="http://ex.go.kr/a.html", html=""), soup)]
     assert srcs == ["http://ex.go.kr/w/x.html", "http://ex.go.kr/w/y.html"]
+
+
+# ---------- AR5: --demo ----------
+def test_demo_runs_offline(tmp_path):
+    from iad.demo import run_demo
+    logs: list[str] = []
+    res = run_demo(log=logs.append, result_dir=tmp_path, open_browser=False)
+    assert (tmp_path / "result.json").is_file() and (tmp_path / "report.html").is_file()
+    off = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))["findings"]
+    assert len(off) >= 30 and res.pages
+    assert all(f["url"].startswith("http://127.0.0.1:") for f in off)
