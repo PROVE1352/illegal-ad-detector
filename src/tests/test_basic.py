@@ -597,3 +597,24 @@ def test_hidden_plus_obfuscation_double_finding_same_location(html):
     assert "OFFSCREEN" in codes and (codes & {"JAMO", "HOMOGLYPH"}), codes
     units = {(o["location"], o["technique"]) for o in build_official(fs)}
     assert len(units) == 2 and all(loc == "p.h-dn" for loc, _ in units)
+
+
+
+# ---------- B3: 첫가끝 조합형(NFD) 한글 키워드는 JAMO ----------
+def test_nfd_conjoining_jamo_is_jamo_not_homoglyph():
+    import unicodedata
+    nfd = unicodedata.normalize("NFD", "카지노 바카라")
+    assert nfd != "카지노 바카라" and all(0x1100 <= ord(c) <= 0x11FF for c in nfd.replace(" ", ""))
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body><p>안내 {nfd} 추천 코드</p></body></html>"), "ex.go.kr")
+    codes = {c for f in fs for c in f.official}
+    assert codes == {"JAMO"}, [(f.location, f.official) for f in fs]
+    hidden = analyze_page(Page(url="http://ex.go.kr/p", html=f'<html><body><h1>행복시청 공지사항</h1><p>정상 안내문입니다.</p><p style="display:none">{unicodedata.normalize("NFD", "토토사이트 추천")}</p></body></html>'), "ex.go.kr")
+    assert {c for f in hidden for c in f.official} == {"OFFSCREEN", "JAMO"}
+    assert match_keywords_levels(unicodedata.normalize("NFD", "카지노"))["gambling"][0][2] == "JAMO"
+
+
+def test_nfd_whole_page_is_encoding_not_obfuscation():
+    import unicodedata
+    page = unicodedata.normalize("NFD", "<html><body><h1>행복시청 공지</h1><p>도박 중독 예방 상담 1336 안내문입니다.</p><p>불법 토토사이트 광고 단속 결과</p></body></html>")
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=page), "ex.go.kr")
+    assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]

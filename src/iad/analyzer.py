@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
@@ -48,6 +49,8 @@ def dominant_official(techs: list[tuple[str, str]]) -> str | None:
         if t in names:
             return OFFICIAL_MAP[t]
     return None
+_CONJ_RE = re.compile("[\u1100-\u11ff]")
+_SYL_RE = re.compile("[\uac00-\ud7a3]")
 THRESHOLD = 3.0
 MASS_LINK_MIN = 5
 ADMIN_WINDOW = 100          # 행정 문맥 판정 창(키워드 주변 ±자)
@@ -126,7 +129,15 @@ class PageAnalyzer:
     def __init__(self, page: Page, base_host: str) -> None:
         self.page = page
         self.base_host = base_host
-        self.soup = BeautifulSoup(page.html or "", "lxml")
+        html = page.html or ""
+        if _CONJ_RE.search(html):
+            # 페이지 전체가 NFD(첫가끝 분해)로 저장된 경우(맥·일부 CMS)는 인코딩 특성이지 난독화가 아니므로 NFC 로 되돌린다.
+            # 정상 음절이 섞인 페이지에서 일부 단어만 분해돼 있으면 그대로 두어 JAMO 로 판정한다.
+            n_conj = len(_CONJ_RE.findall(html))
+            n_syl = len(_SYL_RE.findall(html))
+            if n_syl < n_conj * 0.2:
+                html = unicodedata.normalize("NFC", html)
+        self.soup = BeautifulSoup(html, "lxml")
         self.sheet = H.apply_sheet(self.soup, H.sheet_rules(self.soup, page.css_texts))
         self.findings: list[Finding] = []
         self.covered: set[int] = set()

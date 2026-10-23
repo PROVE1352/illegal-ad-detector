@@ -84,9 +84,19 @@ def level_plain(text: str) -> str:
     return _strip_noise((text or "").lower())
 
 
+_HALFWIDTH_JAMO = re.compile("[\uffa1-\uffdc]")
+_CONJOINING = re.compile("[\u1100-\u11ff\ua960-\ua97f\ud7b0-\ud7ff]")
+
+
 def level_jamo(text: str) -> str:
-    """plain + 분리 자모 합성(JAMO 판정용). NFKC 전에 합성해야 호환 자모가 보존된다."""
-    return compose_jamo(level_plain(text))
+    """plain + 분리 자모 합성(JAMO 판정용). 호환 자모(ㅌㅗㅌㅗ)는 직접 합성, 첫가끝 조합형(U+1100~, NFD 분해 한글)은 NFC 로,
+    반각 자모(U+FFA1~)는 호환 자모로 바꾼 뒤 합성한다. NFKC 전에 합성해야 호환 자모가 보존된다."""
+    t = level_plain(text)
+    if _HALFWIDTH_JAMO.search(t):
+        t = _HALFWIDTH_JAMO.sub(lambda m: unicodedata.normalize("NFKC", m.group(0)), t)
+    if _CONJOINING.search(t):
+        t = unicodedata.normalize("NFC", t)
+    return compose_jamo(t)
 
 
 _DIGIT_HOMO = {"0", "1", "2", "3", "4", "5", "7", "8", "9"}
@@ -123,7 +133,7 @@ def _nfkc_keep_jamo(t: str) -> str:
     out = []
     buf = []
     for ch in t:
-        if "\u3131" <= ch <= "\u3163":
+        if "\u3131" <= ch <= "\u3163" or "\u1100" <= ch <= "\u11ff" or "\uffa1" <= ch <= "\uffdc":
             if buf:
                 out.append(unicodedata.normalize("NFKC", "".join(buf)))
                 buf = []
@@ -136,7 +146,7 @@ def _nfkc_keep_jamo(t: str) -> str:
 
 
 def has_jamo(text: str) -> bool:
-    return any("\u3131" <= ch <= "\u3163" or "\u1100" <= ch <= "\u11ff" for ch in text or "")
+    return any("\u3131" <= ch <= "\u3163" or "\u1100" <= ch <= "\u11ff" or "\uffa1" <= ch <= "\uffdc" for ch in text or "")
 
 
 def aggressive(text: str, alt_i: bool = False) -> str:
@@ -241,6 +251,8 @@ def consonant_runs(text: str) -> list[str]:
 
 
 def has_composable_jamo(text: str) -> bool:
-    """합성 가능한 분리 자모(ㅌㅗ 처럼 자음+모음)가 있으면 True. 'ㅋㅋ' 같은 단독 자음은 제외."""
+    """합성 가능한 분리 자모(ㅌㅗ 처럼 자음+모음, 첫가끝 조합형, 반각 자모)가 있으면 True. 'ㅋㅋ' 같은 단독 자음은 제외."""
     t = text or ""
+    if _CONJOINING.search(t) or _HALFWIDTH_JAMO.search(t):
+        return True
     return compose_jamo(t) != t
