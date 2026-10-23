@@ -43,3 +43,4 @@ output/
 # OS
 .DS_Store
 Thumbs.db
+build/dist_ocr/
