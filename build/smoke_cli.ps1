@@ -5,6 +5,8 @@
 #     meta/findings 키 존재, result_extra.json(있으면) 동일 검사, HTML 리포트 생성.
 #  4) --demo --no-open: 내장 테스트베드 스캔 → <exe 폴더>/demo 에 result.json·report.html·demo_labels.json.
 #  5) -ExpectRenderFallback(정적 전용 빌드): --render 를 줘도 안내 로그를 남기고 정적 분석으로 끝나는지.
+#  6) 강제 종료 내구성: 페이지 수를 크게·간격을 길게 실행하고 5초 뒤 kill → exe 폴더 result.json 이 유효 JSON(meta 포함)인지.
+#  요약은 <OutDir>/smoke_summary.txt 에 남긴다.
 param(
     [Parameter(Mandatory = $true)][string]$AppDir,
     [Parameter(Mandatory = $true)][string]$FixturesDir,
@@ -55,6 +57,8 @@ function Test-ResultJson([string]$path, [string]$label, [bool]$needFindings) {
         if ($needFindings) { Check ($n -gt 0) "$label 검출 1건 이상" }
     } catch { Check $false "$label JSON 파싱 ($($_.Exception.Message))" }
 }
+
+$summary = New-Object System.Collections.Generic.List[string]
 
 $cli = Join-Path $AppDir "iad-cli.exe"
 if (-not (Test-Path -LiteralPath $cli)) { throw "CLI exe 없음: $cli" }
@@ -148,8 +152,16 @@ try {
     # 4) --demo (브라우저 자동 열기 끔). 결과는 기본 위치 <exe 폴더>/demo 에 생긴다.
     $demoDir = Join-Path $AppDir "demo"
     if (Test-Path -LiteralPath $demoDir) { Remove-Item -LiteralPath $demoDir -Recurse -Force }
+    $swDemo = [Diagnostics.Stopwatch]::StartNew()
     $r = Invoke-Cli @("--demo", "--no-open") "demo"
+    $swDemo.Stop()
     Check ($r.Code -eq 0) "--demo 종료 코드 0 (실제 $($r.Code))"
+    $bLines = @($r.Out -split "`r?`n" | Where-Object { $_ -match "브라우저 단계" } | ForEach-Object { $_.Trim() })
+    Check ($bLines.Count -gt 0) "--demo 로그에 브라우저 단계 실행/생략 사유"
+    $summary.Add(("demo 소요 {0:N1}s" -f $swDemo.Elapsed.TotalSeconds))
+    foreach ($l in $bLines) { $summary.Add("demo 브라우저: $l") }
+    $tLine = @($r.Out -split "`r?`n" | Where-Object { $_ -match "탐지 완료|데모 결과" } | ForEach-Object { $_.Trim() })
+    foreach ($l in $tLine) { $summary.Add("demo: $l") }
     Test-ResultJson (Join-Path $demoDir "result.json") "demo/result.json" $true
     Check (Test-Path -LiteralPath (Join-Path $demoDir "demo_labels.json")) "demo/demo_labels.json 생성"
     $demoHtml = @(Get-ChildItem -LiteralPath $demoDir -Filter *.html -ErrorAction SilentlyContinue)
@@ -161,14 +173,47 @@ try {
         $fbDir = Join-Path $OutDir "렌더 폴백"
         $r = Invoke-Cli @("--url", $entry, "--render", "--result-dir", $fbDir, "--delay", "0", "--depth", "3") "render_fallback"
         Check ($r.Code -eq 0) "--render(정적 전용) 종료 코드 0 (실제 $($r.Code))"
-        $fbLine = @($r.Out -split "`r?`n" | Where-Object { $_ -match "렌더 비교 생략" })
+        $fbLine = @($r.Out -split "`r?`n" | Where-Object { $_ -match "렌더 비교 생략|렌더 비교를 사용할 수 없어" })
         Check ($fbLine.Count -gt 0) "--render 선택 시 안내 로그 ('$($fbLine -join ' / ')')"
         Test-ResultJson (Join-Path $fbDir "result.json") "렌더 폴백 result.json" $true
+        $summary.Add("render 폴백: $($fbLine -join ' / ')")
     }
+
+    # 6) 강제 종료 내구성 (TerminateProcess: 종료 핸들러가 돌 기회 없음)
+    $resPath = Join-Path $AppDir "result.json"
+    Remove-Item -LiteralPath $resPath, (Join-Path $AppDir "result_extra.json") -ErrorAction SilentlyContinue
+    $killArgs = @("--url", $entry, "--max-pages", "1000", "--depth", "10", "--delay", "1")
+    Write-Host "== (강제 종료) iad-cli $($killArgs -join ' ')"
+    $t0 = Get-Date
+    $kp = Start-Process -FilePath $cli -ArgumentList ($killArgs | ForEach-Object { "`"$_`"" }) -WorkingDirectory $OutDir `
+        -RedirectStandardOutput (Join-Path $OutDir "cli_kill_stdout.log") -RedirectStandardError (Join-Path $OutDir "cli_kill_stderr.log") -PassThru -NoNewWindow
+    $null = $kp.Handle
+    Start-Sleep -Seconds 5
+    $alive = -not $kp.HasExited
+    Check $alive "강제 종료 시점(5초)에 아직 실행 중"
+    Stop-Process -Id $kp.Id -Force -ErrorAction SilentlyContinue
+    $null = $kp.WaitForExit(10000)
+    Get-Content -LiteralPath (Join-Path $OutDir "cli_kill_stdout.log") -Encoding utf8 | Select-Object -Last 8 | Out-Host
+    $fresh = (Test-Path -LiteralPath $resPath) -and ((Get-Item -LiteralPath $resPath).LastWriteTime -ge $t0.AddSeconds(-1))
+    Check $fresh "강제 종료 후 result.json 이 이번 실행에서 기록됨"
+    Test-ResultJson $resPath "강제 종료 후 result.json" $false
+    if (Test-Path -LiteralPath $resPath) {
+        Copy-Item -LiteralPath $resPath -Destination (Join-Path $OutDir "result_after_kill.json") -Force
+        try {
+            $kj = [IO.File]::ReadAllText($resPath, [Text.Encoding]::UTF8) | ConvertFrom-Json
+            $summary.Add("kill(5s): 유효 JSON, findings $(@($kj.findings).Count)건, meta.elapsed_sec=$($kj.meta.elapsed_sec), finished_at=$($kj.meta.finished_at)")
+        } catch { $summary.Add("kill(5s): JSON 파싱 실패 $($_.Exception.Message)") }
+    } else { $summary.Add("kill(5s): result.json 없음") }
+    $tmpLeft = @(Get-ChildItem -LiteralPath $AppDir -Filter "*.tmp" -ErrorAction SilentlyContinue)
+    Write-Host "  exe 폴더 임시파일 잔존: $($tmpLeft.Count)개"
 }
 finally {
     if ($server -and -not $server.HasExited) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
 }
+
+$summary.Add("실패 검사 $($failures.Count)건")
+$summary | Set-Content -LiteralPath (Join-Path $OutDir "smoke_summary.txt") -Encoding utf8
+Write-Host "---- 요약 ----"; $summary | ForEach-Object { Write-Host "  $_" }
 
 if ($failures.Count -gt 0) {
     Write-Host "CLI 스모크: FAIL ($($failures.Count)건)"

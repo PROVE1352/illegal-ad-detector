@@ -45,11 +45,88 @@ if os.environ.get("IAD_SMOKE") == "1":
 
         _orig_misc_mainloop = _tk.Misc.mainloop
 
+        _capture = os.environ.get("IAD_SMOKE_CAPTURE") == "1"   # 캡처 모드: 첫 화면 → 데모 실행 → 결과 화면
+        _ack_dir = os.environ.get("IAD_SMOKE_ACK_DIR", "")
+
+        if _capture:
+            # 데모가 끝나면 GUI 가 리포트를 브라우저로 여는데, 캡처 화면을 가리지 않도록 막는다.
+            import webbrowser as _wb
+
+            _wb.open = lambda *a, **k: True
+            _wb.open_new = _wb.open_new_tab = _wb.open
+
+        def _ack(name):
+            return bool(_ack_dir) and os.path.exists(os.path.join(_ack_dir, name))
+
+        def _capture_flow(root):
+            state = {"seen_disabled": False, "t": 0}
+
+            def front():
+                try:
+                    root.deiconify()
+                    root.lift()
+                    root.attributes("-topmost", True)
+                    root.focus_force()
+                except Exception:
+                    pass
+
+            def wait_ack(name, then):
+                if _ack(name):
+                    then()
+                else:
+                    root.after(300, lambda: wait_ack(name, then))
+
+            def shot1():
+                front()
+                root.update_idletasks()
+                _write_marker("shot1-ready")
+                wait_ack("ack1", start_demo)
+
+            def start_demo():
+                btn = getattr(root, "demo_btn", None)
+                if btn is None:
+                    _write_marker("demo-button-missing")
+                    root.destroy()
+                    return
+                btn.invoke()
+                _write_marker("demo-started")
+                root.after(500, poll_demo)
+
+            def poll_demo():
+                btn = root.demo_btn
+                st = str(btn.cget("state"))
+                if st == "disabled":
+                    state["seen_disabled"] = True
+                if state["seen_disabled"] and st != "disabled":
+                    root.after(1500, shot2)
+                else:
+                    root.after(500, poll_demo)
+
+            def shot2():
+                front()
+                root.update_idletasks()
+                _write_marker("shot2-ready")
+                wait_ack("ack2", finish)
+
+            def finish():
+                _write_marker("capture-done")
+                root.destroy()
+
+            def overall_timeout():
+                _write_marker("capture-timeout")
+                root.destroy()
+
+            root.after(240000, overall_timeout)
+            root.after(2500, shot1)
+
         def _smoke_mainloop(self, n=0):
             _write_marker("mainloop-entered")
             try:
                 root = self._root()
-                root.after(_seconds * 1000, root.destroy)
+                if _capture:
+                    _capture_flow(root)
+                else:
+                    root.after(_seconds * 1000, root.destroy)
             except Exception as exc:  # pragma: no cover
                 _write_marker("after-failed: %r" % (exc,))
             return _orig_misc_mainloop(self, n)

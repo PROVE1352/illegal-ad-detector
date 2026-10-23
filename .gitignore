@@ -33,6 +33,7 @@ build/work/
 build/dist_windows/
 build/*.zip
 build/smoke_out/
+build/captures/
 
 # 실행 결과
 reports/

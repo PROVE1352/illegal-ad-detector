@@ -113,6 +113,21 @@ jobs:
             }
           }
 
+      - name: 실행 캡처 3장 (제출본)
+        if: steps.check.outputs.ready == 'true' && matrix.variant == 'static'
+        continue-on-error: true
+        run: |
+          $kdir = Join-Path $env:RUNNER_TEMP ("한글 경로" + [IO.Path]::DirectorySeparatorChar + "불법광고 탐지기")
+          ./build/capture_gui.ps1 -AppDir $kdir -OutDir build/captures
+          if ($LASTEXITCODE -ne 0) { throw "캡처 일부 실패" }
+
+      - uses: actions/upload-artifact@v6
+        if: always() && steps.check.outputs.ready == 'true' && matrix.variant == 'static'
+        with:
+          name: captures-static
+          path: build/captures/
+          if-no-files-found: ignore
+
       - name: 산출물 zip
         if: steps.check.outputs.ready == 'true'
         run: |
