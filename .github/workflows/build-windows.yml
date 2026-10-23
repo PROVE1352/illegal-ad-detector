@@ -1,0 +1,130 @@
+name: build-windows
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      selftest:
+        description: "GUI 스모크 판정 자체검증(일부러 죽는 exe 가 FAIL 로 잡히는지)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: pwsh
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONIOENCODING: "utf-8"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: src 준비 여부 확인
+        id: check
+        run: |
+          if ((Test-Path src/run_gui.py) -and (Test-Path src/requirements.txt)) {
+            "ready=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "ready=false" >> $env:GITHUB_OUTPUT
+            Write-Host "::warning::src/run_gui.py 또는 src/requirements.txt 가 아직 없어 빌드를 건너뜁니다."
+          }
+
+      - uses: actions/setup-python@v5
+        if: steps.check.outputs.ready == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            src/requirements.txt
+            build/requirements-build.txt
+
+      - name: 의존성 설치
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r src/requirements.txt
+          python -m pip install -r build/requirements-build.txt
+          python -m pip list
+
+      - name: 단위 테스트(있으면)
+        if: steps.check.outputs.ready == 'true' && hashFiles('src/tests/**/*.py') != ''
+        continue-on-error: true
+        working-directory: src
+        run: python -m pytest -q
+
+      - name: PyInstaller 빌드 (onedir, GUI + CLI)
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          pyinstaller build/iad.spec --noconfirm --clean --distpath build/dist --workpath build/work
+          Get-ChildItem build/dist/IllegalAdDetector | Format-Table Name, Length
+
+      - name: 스모크 테스트 (한글 경로에 복사해서 실행)
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          $kdir = Join-Path $env:RUNNER_TEMP ("한글 경로" + [IO.Path]::DirectorySeparatorChar + "불법광고 탐지기")
+          New-Item -ItemType Directory -Force -Path $kdir | Out-Null
+          Copy-Item -Recurse -Force build/dist/IllegalAdDetector/* $kdir
+          $out = Join-Path $env:RUNNER_TEMP "스모크 결과"
+          ./build/smoke_cli.ps1 -AppDir $kdir -FixturesDir src/fixtures -OutDir $out
+          if ($LASTEXITCODE -ne 0) { throw "CLI 스모크 실패" }
+          ./build/smoke_gui.ps1 -Exe (Join-Path $kdir "IllegalAdDetector.exe") -WorkDir (Join-Path $out "gui")
+          if ($LASTEXITCODE -ne 0) { throw "GUI 스모크 실패" }
+          New-Item -ItemType Directory -Force -Path build/smoke_out | Out-Null
+          Copy-Item -Recurse -Force "$out/*" build/smoke_out/
+
+      - name: 산출물 zip
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/IllegalAdDetector-windows.zip -Force
+          Get-Item build/IllegalAdDetector-windows.zip | Format-Table Name, Length
+
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          name: IllegalAdDetector-windows
+          path: build/IllegalAdDetector-windows.zip
+          if-no-files-found: error
+          compression-level: 0
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.check.outputs.ready == 'true'
+        with:
+          name: smoke-output
+          path: build/smoke_out/
+          if-no-files-found: ignore
+
+  gui-smoke-selftest:
+    if: github.event_name == 'workflow_dispatch' && inputs.selftest
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r build/requirements-build.txt
+      - name: 셀프테스트 exe 빌드
+        run: |
+          foreach ($n in "good_gui", "bad_gui") {
+            pyinstaller build/selftest/$n.py --windowed --onedir --noconfirm --name $n `
+              --runtime-hook build/hooks/rth_iad.py --distpath build/dist_selftest --workpath build/work_selftest
+          }
+      - name: good 은 PASS, bad 는 FAIL 이어야 함
+        run: |
+          ./build/smoke_gui.ps1 -Exe build/dist_selftest/good_gui/good_gui.exe -TimeoutSec 40
+          if ($LASTEXITCODE -ne 0) { throw "good_gui 가 FAIL 로 판정됨 (판정 로직 오류)" }
+          ./build/smoke_gui.ps1 -Exe build/dist_selftest/bad_gui/bad_gui.exe -TimeoutSec 30
+          if ($LASTEXITCODE -eq 0) { throw "bad_gui 가 PASS 로 판정됨 (거짓 통과)" }
+          Write-Host "셀프테스트 통과: 판정 로직이 크래시를 잡아낸다"
+          exit 0

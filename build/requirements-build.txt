@@ -1,0 +1,5 @@
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.9
+# src/requirements.txt 에서 선택 항목(주석)인 렌더링 모드를 exe 에 포함하기 위해 설치한다.
+# 브라우저는 내려받지 않는다(playwright install 실행 안 함). 런타임에 channel="msedge" 사용.
+playwright==1.64.1

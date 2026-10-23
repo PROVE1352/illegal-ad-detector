@@ -1,0 +1,39 @@
+# 제출 양식·개인정보 (커밋 금지)
+submission/
+docs/**/*.hwp
+docs/**/*.hwpx
+docs/**/*.doc
+docs/**/*.docx
+docs/**/*.xls
+docs/**/*.xlsx
+docs/**/*.pdf
+docs/**/*.zip
+docs/**/*.jpg
+docs/**/*.jpeg
+docs/**/*.png
+*.hwp
+*.hwpx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# 빌드 산출물
+build/dist/
+build/work/
+build/dist_windows/
+build/*.zip
+build/smoke_out/
+
+# 실행 결과
+reports/
+output/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
