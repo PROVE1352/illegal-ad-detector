@@ -182,7 +182,7 @@ def test_hidden_new_patterns(style, tech):
 
 
 @pytest.mark.parametrize("style", [
-    "color:#999", "color:#f0f0f0", "transform:translate(-50%,-50%)", "margin-left:-20px", "left:-9999px",  # position 없음
+    "color:#999", "color:#e0e0e0", "transform:translate(-50%,-50%)", "margin-left:-20px", "left:-9999px",  # position 없음 (#f0f0f0 은 고명도 허용폭 18 안이라 의도적 매치)
     "text-indent:-50%", "opacity:0.5", "font-size:1.2px",
 ])
 def test_hidden_negative_patterns(style):
@@ -749,3 +749,32 @@ def test_korean_leet_homoglyph(text):
 def test_korean_leet_negatives(text):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body><p>{text}</p></body></html>"), "ex.go.kr")
     assert not fs, (text, [(f.location, f.official, f.extra_names) for f in fs])
+
+
+# ---------- 조정안 C: 오프셋 -300px·-100%, 고명도 배경 색차 18 ----------
+@pytest.mark.parametrize("style,tech", [
+    ("position:absolute;left:-300px", "offscreen"), ("text-indent:-300px", "offscreen"), ("text-indent:-100%", "offscreen"),
+    ("position:absolute;left:-100%", "offscreen"), ("text-indent:-100vw", "offscreen"), ("position:relative;margin-left:-300px", "offscreen"),
+    ("height:0;overflow:hidden", "tiny_size"), ("width:0;overflow:hidden", "tiny_size"), ("font-size:0.05rem", "font_size_zero"), ("font-size:0.5pt", "font_size_zero"),
+])
+def test_offscreen_thresholds_relaxed(style, tech):
+    soup = BeautifulSoup(f'<html><body><span style="{style}">x</span></body></html>', "lxml")
+    assert tech in [t for t, _ in H.hidden_techniques(soup.find("span"), {})]
+
+
+@pytest.mark.parametrize("style", ["position:absolute;left:-200px", "text-indent:-50%", "position:absolute;left:-99%", "margin-left:-200px",
+                                   "text-indent:-2em", "position:relative;top:-100px"])
+def test_offscreen_thresholds_not_too_loose(style):
+    soup = BeautifulSoup(f'<html><body><span style="{style}">x</span></body></html>', "lxml")
+    assert not H.hidden_techniques(soup.find("span"), {})
+
+
+def test_transparent_high_luminance_tolerance():
+    assert H.colors_close("ffffff", "f0f0f0") and H.colors_close("fafafa", "ededed") and H.colors_close("000000", "121212")
+    assert not H.colors_close("ffffff", "e0e0e0") and not H.colors_close("888888", "999999") and not H.colors_close("ffffff", "dddddd")
+    html = '<table><tr><td style="background:#f0f0f0"><span>납부 안내</span><span style="color:#ffffff">안전놀이터 먹튀검증</span></td></tr></table>'
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert any("TRANSPARENT" in f.official for f in fs)
+    neg = '<div style="background:#f0f0f0"><p style="color:#666">토토사이트 광고 단속 안내 1336</p><p style="color:#eee">회색 글씨 안내문</p></div>'
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{neg}</body></html>"), "ex.go.kr")
+    assert not any(f.official for f in fs)

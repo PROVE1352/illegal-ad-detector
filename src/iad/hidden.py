@@ -40,8 +40,11 @@ RELEVANT_PROPS = {
     "overflow-x", "overflow-y", "max-height", "max-width", "scale",
 }
 MAX_RULES = 20000
-NEAR_TOLERANCE = 10
-_SIMPLE_SEL = re.compile(r"^(?P<tag>[a-zA-Z][\w-]*)?(?P<cls>(?:\.[\w-]+)+)?(?P<id>#[\w-]+)?$")   # 글자색-배경색 채널별 차이가 이 값 이하면 '사실상 같은 색'(대비 매우 낮음)
+NEAR_TOLERANCE = 10           # 글자색-배경색 채널별 차이가 이 값 이하면 '사실상 같은 색'(대비 매우 낮음)
+NEAR_TOLERANCE_EXTREME = 18   # 둘 다 고명도(각 채널 ≥235: #f0f0f0 위 #fff) 또는 저명도(≤25) 면 허용 폭 확대
+OFFSCREEN_PX = -300           # 이 값 이하의 음수 오프셋(px 환산)은 화면 밖
+OFFSCREEN_PCT = -100          # text-indent/left 등의 % 값이 이 값 이하면 화면 밖
+_SIMPLE_SEL = re.compile(r"^(?P<tag>[a-zA-Z][\w-]*)?(?P<cls>(?:\.[\w-]+)+)?(?P<id>#[\w-]+)?$")
 
 
 # ---------- 선언 파싱 ----------
@@ -162,11 +165,14 @@ def colors_close(a: str, b: str, tol: int = NEAR_TOLERANCE) -> bool:
     if a == b:
         return True
     try:
-        ra, ga, ba = int(a[0:2], 16), int(a[2:4], 16), int(a[4:6], 16)
-        rb, gb, bb = int(b[0:2], 16), int(b[2:4], 16), int(b[4:6], 16)
+        ca = (int(a[0:2], 16), int(a[2:4], 16), int(a[4:6], 16))
+        cb = (int(b[0:2], 16), int(b[2:4], 16), int(b[4:6], 16))
     except ValueError:
         return False
-    return max(abs(ra - rb), abs(ga - gb), abs(ba - bb)) <= tol
+    both_light = all(c >= 235 for c in ca + cb)
+    both_dark = all(c <= 25 for c in ca + cb)
+    limit = max(tol, NEAR_TOLERANCE_EXTREME) if (both_light or both_dark) else tol
+    return max(abs(x - y) for x, y in zip(ca, cb)) <= limit
 
 
 # ---------- 길이 ----------
@@ -189,6 +195,13 @@ def _px(value: str | None, allow_pct: bool = False) -> float | None:
     if unit.startswith(("vw", "vh")):
         return n * 10
     return n
+
+
+def _pct(value: str | None) -> float | None:
+    if not value or "%" not in value:
+        return None
+    m = re.match(r"\s*(-?\d+(?:\.\d+)?)%", value.strip())
+    return float(m.group(1)) if m else None
 
 
 def _lengths(value: str) -> list[float]:
@@ -270,9 +283,9 @@ def _may_hide(prop: str, val: str) -> bool:
                 "overflow-y", "display", "visibility", "opacity", "font-size", "font", "left", "top", "right", "bottom",
                 "inset", "text-indent", "height", "width", "max-height", "max-width", "scale"):
         return True
-    # margin/transform 은 규칙 수가 매우 많고 숨김 용도는 드물어 화면 밖(≤-500px) 값일 때만 남긴다
+    # margin/transform 은 규칙 수가 매우 많고 숨김 용도는 드물어 화면 밖(≤-300px) 값일 때만 남긴다
     if prop in ("margin", "margin-left", "margin-top", "margin-right", "margin-bottom", "transform", "translate"):
-        return "-" in val and any(x <= -500 for x in _lengths(val))
+        return "-" in val and any(x <= OFFSCREEN_PX for x in _lengths(val))
     if prop in ("clip", "clip-path"):
         return True
     if prop in ("width", "height"):
@@ -436,27 +449,33 @@ def _offscreen_reason(st: dict[str, str]) -> str | None:
     if pos in ("absolute", "fixed", "relative", "sticky"):
         for k in ("left", "top", "right", "bottom"):
             v = _px(st.get(k))
-            if v is not None and v <= -500:
+            if v is not None and v <= OFFSCREEN_PX:
                 return f"position:{pos}; {k}:{st[k]}"
+            pct = _pct(st.get(k))
+            if pct is not None and pct <= OFFSCREEN_PCT:
+                return f"position:{pos}; {k}:{st[k]} (% 화면 밖)"
             if v is not None and v >= 5000 and pos in ("absolute", "fixed"):
                 return f"position:{pos}; {k}:{st[k]} (뷰포트 밖 양수)"
         if st.get("inset"):
-            if any(v <= -500 for v in _lengths(st["inset"])):
+            if any(v <= OFFSCREEN_PX for v in _lengths(st["inset"])):
                 return f"position:{pos}; inset:{st['inset']}"
     ti = _px(st.get("text-indent"))
-    if ti is not None and ti <= -500:
+    if ti is not None and ti <= OFFSCREEN_PX:
+        return f"text-indent:{st['text-indent']}"
+    tip = _pct(st.get("text-indent"))
+    if tip is not None and tip <= OFFSCREEN_PCT:
         return f"text-indent:{st['text-indent']}"
     tf = st.get("transform") or ""
     for m in re.finditer(r"translate(?:3d|x|y)?\(([^)]*)\)", tf):
-        if any(v <= -500 for v in _lengths(m.group(1))):
+        if any(v <= OFFSCREEN_PX for v in _lengths(m.group(1))):
             return f"transform:{tf[:60]}"
-    if st.get("translate") and any(v <= -500 for v in _lengths(st["translate"])):
+    if st.get("translate") and any(v <= OFFSCREEN_PX for v in _lengths(st["translate"])):
         return f"translate:{st['translate']}"
     for k in ("margin-left", "margin-top", "margin-right", "margin-bottom"):
         v = _px(st.get(k))
-        if v is not None and v <= -500:
+        if v is not None and v <= OFFSCREEN_PX:
             return f"{k}:{st[k]}"
-    if st.get("margin") and any(v <= -500 for v in _lengths(st["margin"])):
+    if st.get("margin") and any(v <= OFFSCREEN_PX for v in _lengths(st["margin"])):
         return f"margin:{st['margin']}"
     return None
 
