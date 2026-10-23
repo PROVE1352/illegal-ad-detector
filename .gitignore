@@ -1,5 +1,8 @@
-# 제출 양식·개인정보 (커밋 금지)
+# 제출 양식·개인정보·공고문 원본 (커밋 금지): docs/ 전체와 submission/
 submission/
+docs/
+# 에이전트 작업 메모
+argon/
 docs/**/*.hwp
 docs/**/*.hwpx
 docs/**/*.doc
