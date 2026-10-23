@@ -98,6 +98,7 @@ class Crawler:
         self.stopped_reason = ""
         self._stop = False
         self.css_cache: dict[str, str | None] = {}   # 스타일시트 URL → 본문(실패면 None)
+        self.post_jobs: dict[str, tuple[str, dict[str, str]]] = {}   # 표시 URL → (action, POST data)
         self._counter = 0
         self._entry_dir = urlparse(start_url).path.rsplit("/", 1)[0] + "/"
         self.robots: robotparser.RobotFileParser | None = None
@@ -133,7 +134,9 @@ class Crawler:
         return True
 
     def fetch(self, url: str, depth: int, parent: str | None = None, is_iframe: bool = False,
-              external: bool = False, top_url: str | None = None, frame_prefix: str = "") -> Page:
+              external: bool = False, top_url: str | None = None, frame_prefix: str = "",
+              post: tuple[str, dict[str, str]] | None = None) -> Page:
+        """post=(action, data) 면 action 에 POST 하고(전자정부 폼 게시판), page.url 은 입력 url(action?식별파라미터 표기)을 유지한다."""
         page = Page(url=url, html="", depth=depth, parent_url=parent, is_iframe=is_iframe, external=external,
                     top_url=top_url, frame_prefix=frame_prefix)
         if self.cfg.allowed_hosts is not None and host_of(url) not in self.cfg.allowed_hosts:
@@ -142,7 +145,13 @@ class Crawler:
         try:
             if self.pages_fetched > 0 and self.cfg.delay > 0:
                 time.sleep(self.cfg.delay)
-            resp = self.session.get(url, timeout=self.cfg.timeout, allow_redirects=True, stream=True)
+            if post is not None:
+                resp = self.session.post(post[0], data=post[1], timeout=self.cfg.timeout, allow_redirects=True, stream=True)
+                if resp.status_code >= 400:   # POST 를 안 받는 서버면 같은 파라미터로 GET 재시도
+                    resp.close()
+                    resp = self.session.get(url, timeout=self.cfg.timeout, allow_redirects=True, stream=True)
+            else:
+                resp = self.session.get(url, timeout=self.cfg.timeout, allow_redirects=True, stream=True)
             self.pages_fetched += 1
             page.status = resp.status_code
             ctype = resp.headers.get("content-type", "")
@@ -152,7 +161,8 @@ class Crawler:
                 return page
             resp._content = resp.raw.read(self.cfg.max_html_bytes, decode_content=True)  # noqa: SLF001
             page.html, page.encoding = decode_html(resp)
-            page.url = resp.url or url
+            if post is None:
+                page.url = resp.url or url
         except requests.RequestException as e:
             page.error = f"요청 실패: {e.__class__.__name__}: {e}"
             self.pages_fetched += 1
@@ -266,6 +276,98 @@ class Crawler:
             if n >= 20:
                 break
 
+    # ---------- 폼(POST) 게시판: onclick="fn_egov_select('1024')" → 스크립트 함수 본문의 '폼 필드 = 인자' 대입 + <form action> 재현 ----------
+    _CALL = re.compile(r"([A-Za-z_$][\w$]*)\s*\(([^()]*)\)")
+    _ARG = re.compile(r"[\"']([^\"']*)[\"']|(-?\d+)")
+
+    @staticmethod
+    def _function_body(scripts: str, name: str) -> tuple[list[str], str] | None:
+        m = re.search(r"function\s+" + re.escape(name) + r"\s*\(([^)]*)\)\s*\{", scripts) or \
+            re.search(re.escape(name) + r"\s*=\s*function\s*\(([^)]*)\)\s*\{", scripts)
+        if not m:
+            return None
+        params = [p.strip() for p in m.group(1).split(",") if p.strip()]
+        i, depth = m.end(), 1
+        while i < len(scripts) and depth:
+            depth += scripts[i] == "{"
+            depth -= scripts[i] == "}"
+            i += 1
+        return params, scripts[m.end():i - 1]
+
+    def extract_form_posts(self, page: Page, soup: BeautifulSoup) -> list[tuple[str, str, dict[str, str], str]]:
+        """[(표시 URL, action URL, 데이터, 메서드)] — 핸들러 호출 인자를 함수 본문의 폼 필드 대입에 대응시켜 요청을 재현한다."""
+        forms: list[tuple[str, str, str, dict[str, str]]] = []   # (name/id, method, action, inputs)
+        for fm in soup.find_all("form"):
+            inputs = {str(i.get("name")): str(i.get("value", "")) for i in fm.find_all(["input", "select", "textarea"]) if i.get("name")}
+            forms.append((str(fm.get("name") or fm.get("id") or ""), str(fm.get("method", "get")).lower(),
+                          urljoin(page.url, str(fm.get("action") or page.url)), inputs))
+        scripts = "\n".join(sc.get_text() or "" for sc in soup.find_all("script"))
+        if not scripts.strip():
+            return []
+        handlers: list[str] = [str(el["onclick"]) for el in soup.find_all(attrs={"onclick": True})]
+        for a in soup.find_all("a", href=True):
+            h = str(a["href"]).strip()
+            if h.lower().startswith("javascript:"):
+                handlers.append(h[11:])
+        out: list[tuple[str, str, dict[str, str], str]] = []
+        seen: set[str] = set()
+        cache: dict[str, tuple[list[str], str] | None] = {}
+        for hd in handlers[:400]:
+            for m in self._CALL.finditer(hd):
+                name, raw_args = m.group(1), m.group(2)
+                if name in ("return", "if", "alert", "confirm", "void", "open", "focus"):
+                    continue
+                args = [(g1 if g1 is not None else g2) for g1, g2 in
+                        ((mm.group(1), mm.group(2)) for mm in self._ARG.finditer(raw_args))]
+                if not args:
+                    continue
+                if name not in cache:
+                    cache[name] = self._function_body(scripts, name)
+                fb = cache[name]
+                if not fb:
+                    continue
+                params, body = fb
+                pmap = {p: a for p, a in zip(params, args)}
+                # location.href = "/board/view.do?nttId=" + nttId  → GET
+                gm = re.search(r"[\"']([^\"']*[?&][\w.]+=)[\"']\s*\+\s*(\w+)", body)
+                if gm and gm.group(2) in pmap:
+                    u = urljoin(page.url, gm.group(1) + str(pmap[gm.group(2)]))
+                    if u not in seen:
+                        seen.add(u)
+                        out.append((u, u, {}, "get"))
+                    continue
+                assigns: dict[str, str] = {}
+                for fm_ in re.finditer(r"(\w+)\.value\s*=\s*(\w+)\s*;", body):
+                    if fm_.group(2) in pmap:
+                        assigns[fm_.group(1)] = str(pmap[fm_.group(2)])
+                for fm_ in re.finditer(r"\$\([\"']#?(\w+)[\"']\)\.val\(\s*(\w+)\s*\)", body):
+                    if fm_.group(2) in pmap:
+                        assigns[fm_.group(1)] = str(pmap[fm_.group(2)])
+                for fm_ in re.finditer(r"\[name=[\"']?(\w+)[\"']?\]\s*\)?\.val\(\s*(\w+)\s*\)", body):
+                    if fm_.group(2) in pmap:
+                        assigns[fm_.group(1)] = str(pmap[fm_.group(2)])
+                if not assigns or not re.search(r"\.submit\s*\(|\.trigger\(\s*[\"']submit", body):
+                    continue
+                fname = None
+                fm2 = re.search(r"document\.(\w+)\.\w+\.value|document\.(\w+)\.submit|\$\([\"']#(\w+)[\"']\)\.submit|getElementById\([\"'](\w+)[\"']\)", body)
+                if fm2:
+                    fname = next((g for g in fm2.groups() if g), None)
+                form = next((f for f in forms if fname and f[0] == fname), None) or (forms[0] if forms else None)
+                am = re.search(r"\.action\s*=\s*[\"']([^\"']+)[\"']|attr\(\s*[\"']action[\"']\s*,\s*[\"']([^\"']+)[\"']", body)
+                action = urljoin(page.url, (am.group(1) or am.group(2))) if am else (form[2] if form else None)
+                if not action or not is_same_site(action, self.base_host):
+                    continue
+                mm_ = re.search(r"\.method\s*=\s*[\"'](\w+)[\"']", body)
+                method = (mm_.group(1) if mm_ else (form[1] if form else "post")).lower()
+                data = dict(form[3]) if form else {}
+                data.update(assigns)
+                display = action.split("#", 1)[0] + ("&" if "?" in action else "?") + urlencode(sorted(assigns.items()))
+                if display in seen:
+                    continue
+                seen.add(display)
+                out.append((display, action, data, method))
+        return out
+
     @staticmethod
     def _skip_link(link: str) -> bool:
         p = urlparse(link)
@@ -323,8 +425,9 @@ class Crawler:
             if not self._allowed(url):
                 self.log(f"robots.txt 차단: {url}")
                 continue
-            page = self.fetch(url, depth, parent)
-            self.log(f"[{self.pages_fetched}/{self.cfg.max_pages}] d{depth} {page.status} {url}" +
+            job = self.post_jobs.get(url)
+            page = self.fetch(url, depth, parent, post=job)
+            self.log(f"[{self.pages_fetched}/{self.cfg.max_pages}] d{depth} {page.status} {'POST ' if job else ''}{url}" +
                      (f"  ({page.error})" if page.error else ""))
             soup = BeautifulSoup(page.html, "lxml") if (page.html and not page.error) else None
             if soup is not None:
@@ -338,6 +441,13 @@ class Crawler:
                 continue
             for link in self.extract_links(page, soup):
                 self._enqueue(queue, link, depth + 1, page.url)
+            try:
+                for display, action, data, method in self.extract_form_posts(page, soup):
+                    if method == "post" and data:
+                        self.post_jobs.setdefault(display, (action, data))
+                    self._enqueue(queue, display, depth + 1, page.url)
+            except Exception as e:  # 폼 재현 실패는 기존 수집에 영향 없음
+                self.log(f"  폼 게시판 재현 생략: {e.__class__.__name__}")
         if self.stopped_reason:
             self.log(self.stopped_reason)
 

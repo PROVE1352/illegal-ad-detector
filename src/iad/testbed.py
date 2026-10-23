@@ -17,6 +17,7 @@ import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qsl
 
 CSS = """
 body{font-family:sans-serif;margin:0;background:#fff;color:#222}
@@ -416,6 +417,27 @@ class Site:
         self.label("post/post_tabs.html", a3, "OFFSCREEN", "도박")
         self.decoys.append("post/post_tabs.html")
 
+        # COV2: 전자정부식 POST 게시판 — 목록 제목은 onclick 함수 → hidden input 채워 <form method=post> submit. 정적 서버는
+        # 'view.do--nttId-N.html' 로 응답한다. 3번 글에 OFFSCREEN, 5번 글 댓글에 JAMO.
+        e3, e5 = self.nid(), self.nid()
+        rows = "".join('<tr><td class="num">%d</td><td class="title"><a href="#none" onclick="fn_egov_select_notice(\'%d\'); return false;">공지 %d</a></td></tr>' % (i, i, i)
+                       for i in range(1, 6))
+        egov_form = ('<form name="frm" method="post" action="view.do"><input type="hidden" name="nttId"><input type="hidden" name="bbsId" value="BBSMSTR_000000000006"></form>'
+                     '<table class="board-list">' + rows + '</table>'
+                     '<script>function fn_egov_select_notice(nttId) { document.frm.nttId.value = nttId; document.frm.action = "view.do"; document.frm.submit(); }</script>')
+        self.files["egov/list.do"] = self.page("전자정부 게시판", egov_form)
+        for i in range(1, 6):
+            extra = ""
+            if i == 3:
+                extra = '<span id="%s" style="display:none">%s</span>' % (e3, "안전놀이터 토토사이트 가입코드" if not v else "메이저놀이터 먹튀검증 가입머니")
+            comments = ['<span id="%s">%s</span>' % (e5, "ㅋㅏㅈㅣㄴㅗ ㅂㅗㄴㅓㅅㅡ 코드 7" if not v else "ㅂㅏㅋㅏㄹㅏ ㅅㅏㅇㅣㅌㅡ 코드 9")] if i == 5 else ["감사합니다"]
+            cm = "".join('<li class="comment">%s</li>' % c for c in comments)
+            self.files["egov/view.do--nttId-%d.html" % i] = self.page("공지 %d" % i, '<h2 class="title">공지 %d</h2><div class="article-body"><p>공지 %d 본문입니다.%s</p></div>'
+                                                                   '<div class="comments"><ul>%s</ul></div>' % (i, i, extra, cm), list_href="list.do")
+        self.label("egov/view.do--nttId-3.html", e3, "OFFSCREEN", "도박", page="egov/view.do?nttId=3")
+        self.label("egov/view.do--nttId-5.html", e5, "JAMO", "도박", page="egov/view.do?nttId=5")
+        posts.append(("egov/list.do", "전자정부 게시판(폼 POST)"))
+
         # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
         k1 = self.nid()
         normal_body = "<p>시민 제안 공모를 안내합니다. 접수: 10/20~11/5</p>"
@@ -487,8 +509,8 @@ class TestbedHandler(SimpleHTTPRequestHandler):
     def log_message(self, *a) -> None:  # noqa: D102
         pass
 
-    def guess_type(self, path):  # cp949 파일은 charset 헤더 없이 (meta 로 판정하게); .bot 변형은 HTML 로
-        if str(path).endswith(".bot"):
+    def guess_type(self, path):  # cp949 파일은 charset 헤더 없이 (meta 로 판정하게); .bot 변형·.do/.jsp 류 동적 확장자는 HTML 로
+        if str(path).endswith((".bot", ".do", ".jsp", ".php", ".asp", ".aspx", ".action")):
             return "text/html"
         return super().guess_type(path)
 
@@ -498,7 +520,32 @@ class TestbedHandler(SimpleHTTPRequestHandler):
         ref = self.headers.get("Referer", "")
         if (re.search(r"Yeti|Googlebot|bingbot", ua) or "search.naver.com" in ref) and Path(real + ".bot").is_file():
             return real + ".bot"
+        q = path.split("?", 1)[1] if "?" in path else ""
+        if q:   # 폼 게시판 흉내: view.do?nttId=3 → view.do--nttId-3.html
+            alt = query_variant(real, dict(parse_qsl(q)))
+            if alt and Path(alt).is_file():
+                return alt
         return real
+
+    def do_POST(self) -> None:  # noqa: N802
+        """폼 게시판 흉내: POST 본문의 식별 필드로 'action--k-v.html' 정적 파일을 찾아 응답한다."""
+        n = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(n).decode("utf-8", "replace") if n else ""
+        data = dict(parse_qsl(body))
+        real = SimpleHTTPRequestHandler.translate_path(self, self.path.split("?", 1)[0])
+        alt = query_variant(real, data)
+        if alt and Path(alt).is_file():
+            self.path = "/" + Path(alt).relative_to(Path(self.directory)).as_posix()
+            return self.do_GET()
+        self.send_error(404, "no such post page")
+
+
+def query_variant(real: str, data: dict) -> str | None:
+    """정적 파일명 규칙: '<base>--<k>-<v>[--<k>-<v>…].html' (식별 파라미터만, 이름순). hidden 공통값(bbsId)은 제외하고 id/seq/no 류만 쓴다."""
+    keys = [k for k in sorted(data) if re.search(r"(ntt|id|seq|no|idx|num|sn)$", k, re.I) and k.lower() != "bbsid" and str(data[k]).strip()]
+    if not keys:
+        return None
+    return real + "".join(f"--{k}-{data[k]}" for k in keys) + ".html"
 
 
 def pick_port(preferred: int = 0) -> int:

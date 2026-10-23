@@ -778,3 +778,48 @@ def test_transparent_high_luminance_tolerance():
     neg = '<div style="background:#f0f0f0"><p style="color:#666">토토사이트 광고 단속 안내 1336</p><p style="color:#eee">회색 글씨 안내문</p></div>'
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{neg}</body></html>"), "ex.go.kr")
     assert not any(f.official for f in fs)
+
+
+# ---------- COV2: POST 폼 게시판 재현 ----------
+def test_extract_form_posts_patterns():
+    from iad.crawler import Crawler, CrawlConfig
+    c = Crawler("http://ex.go.kr/board/list.do", CrawlConfig(allowed_hosts=()))
+    html = '''<html><body>
+    <form name="frm" method="post" action="/board/view.do"><input type="hidden" name="nttId"><input type="hidden" name="bbsId" value="B01"></form>
+    <form id="frm2" method="post" action="/cmt/list.do"><input type="hidden" name="seq"></form>
+    <a href="#none" onclick="fn_egov_select_notice('1024'); return false;">글1</a>
+    <a href="javascript:fn_egov_select_notice('1180')">글2</a>
+    <a href="#" onclick="goCmt(77)">댓글</a>
+    <a href="#" onclick="goView('55')">상세</a>
+    <a href="#" onclick="alert('x')">무시</a>
+    <script>
+    function fn_egov_select_notice(nttId) { document.frm.nttId.value = nttId; document.frm.action = "/board/view.do"; document.frm.submit(); }
+    function goCmt(seq) { $("#seq").val(seq); $("#frm2").submit(); }
+    function goView(id) { location.href = "/news/view.do?id=" + id; }
+    </script></body></html>'''
+    soup = BeautifulSoup(html, "lxml")
+    got = c.extract_form_posts(Page(url="http://ex.go.kr/board/list.do", html=html), soup)
+    by = {d: (a, data, m) for d, a, data, m in got}
+    assert by["http://ex.go.kr/board/view.do?nttId=1024"] == ("http://ex.go.kr/board/view.do", {"nttId": "1024", "bbsId": "B01"}, "post")
+    assert "http://ex.go.kr/board/view.do?nttId=1180" in by
+    assert by["http://ex.go.kr/cmt/list.do?seq=77"][1] == {"seq": "77"}
+    assert by["http://ex.go.kr/news/view.do?id=55"] == ("http://ex.go.kr/news/view.do?id=55", {}, "get")
+    assert len(got) == 4
+
+
+def test_post_board_end_to_end(tmp_path):
+    """onclick → hidden input → POST 로만 열리는 게시글의 은닉 광고를 수집·탐지하고 url 은 action?nttId=N 으로 적는다."""
+    from iad.testbed import generate, pick_port, serve
+    from iad.crawler import CrawlConfig
+    from iad.scan import scan
+    port = pick_port(0)
+    generate(tmp_path, port)
+    srv = serve(tmp_path, port)
+    try:
+        res = scan(f"http://127.0.0.1:{port}/dev/egov/list.do", CrawlConfig(delay=0, allowed_hosts=("127.0.0.1", "localhost"), cloak_pages=0, depth=2),
+                   out_dir=tmp_path / "out", result_dir=tmp_path / "out", log=lambda m: None, write_report=False)
+    finally:
+        srv.shutdown()
+    urls = {f.page_url for f in res.findings if f.official}
+    assert f"http://127.0.0.1:{port}/dev/egov/view.do?nttId=3" in urls and f"http://127.0.0.1:{port}/dev/egov/view.do?nttId=5" in urls
+    assert {c for f in res.findings for c in f.official} >= {"OFFSCREEN", "JAMO"}

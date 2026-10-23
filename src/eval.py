@@ -43,8 +43,15 @@ _SOUPS: dict[Path, BeautifulSoup] = {}
 
 
 def url_to_file(url: str, root: Path) -> Path | None:
-    p = unquote(urlparse(url).path).lstrip("/")
+    from urllib.parse import parse_qsl
+    from iad.testbed import query_variant
+    u = urlparse(url)
+    p = unquote(u.path).lstrip("/")
     f = root / p
+    if u.query:   # 폼 게시판 표시 URL(view.do?nttId=3) → 정적 변형 파일
+        alt = query_variant(str(f), dict(parse_qsl(u.query)))
+        if alt and Path(alt).is_file():
+            return Path(alt)
     return f if f.is_file() else None
 
 

@@ -15,6 +15,10 @@ src/
     crawler.py        동일 도메인 우선순위 BFS(진입 경로 상세 > 페이지네이션 > 진입 경로 > 다른 영역 상세 > 게시판 영역 > 그 외),
                       링크 소스: href·javascript:/onclick 핸들러 안 URL·data-href/url/link·rel=next/prev·meta refresh·
                       인라인 스크립트 안 동일 사이트 경로(.do/.jsp/.php/.html…, 댓글 목록 URL 등), 지연 로딩 iframe(data-src),
+                      폼(POST) 게시판 재현: onclick/javascript: 핸들러 호출(fn_egov_select('1024'))의 인자를 인라인 스크립트 함수
+                      본문의 '폼 필드.value = 인자'·$('#f').val(인자) 대입에 대응시키고 <form method/action>·hidden input 과 합쳐 POST
+                      (동일 사이트만, 페이지 상한·간격 동일; 4xx 면 GET 재시도). 결과 url 은 action?식별파라미터(예 /board/view.do?nttId=1024)
+                      로 적어 location 과 함께 재현 가능하게 한다. 'location.href = "…?id=" + 인자' 꼴은 GET 으로 복원.
                       iframe(동일 도메인=추적, 외부=1단계 수집+플래그, 중첩 3단계), robots 옵션,
                       EUC-KR 처리, 시간 예산(기본 20분)·최대 페이지(기본 300) 상한,
                       동일 사이트 외부 CSS(<link rel=stylesheet>, @import 1단계) 수집(URL 당 1회 캐시, 최대 40개)
@@ -119,7 +123,8 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
   R2 OFFSCREEN 일반형 페이지 1개(뷰포트 밖 양수·부모 overflow 밖·clip-path/clip·1×1·scale(0)·max-height 0·hidden 속성 + 접힌 아코디언·sr-only·숨긴 메뉴 하드 네거티브).
   R3 버그 재현 페이지(B1 같은 요소 color=background 외부 CSS, B2 숨김 클래스+자모, B3 NFD, B4 IDN 호모그래프)와 이미지 배너 광고 페이지(무작위·회전 도메인·텔레그램 6개 + 정상 롤링 배너 5개).
   조정안 A 페이지(은닉+중위 키워드+보조어 3건, 숨긴 탭 '카지노 관광 안내'·'슬롯머신 규제 현황'·'체험 프로그램 안내'·접근성 숨김 함정 = 정상 문서로 등록).
-  4종 라벨 57개(중첩 2요소 포함), ETC 라벨 22개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
+  전자정부식 POST 게시판(egov/list.do: onclick→hidden input→form submit, 정적 서버가 view.do--nttId-N.html 로 응답) 게시글 2건.
+  4종 라벨 59개(중첩 2요소 포함), ETC 라벨 22개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
 - 채점은 요강 방식 그대로: result.json 의 (url, location, technique) 단위로, location 을 DOM 에서 해석해 라벨 요소와 같은지 비교.
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.
@@ -138,6 +143,7 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
   미디어쿼리 조건(화면 크기)은 해석하지 않는다. JS 로 뒤늦게 붙는 클래스/스타일은 `--render` 일 때만 보인다.
 - 렌더 비교·스크린샷은 Edge+playwright 가 있을 때만(선택). 동적 주입은 그때만 잡힌다.
 - 키워드 사전 기반이라 사전에 없는 신조어는 놓칠 수 있다. 이미지(배너) 안 문구는 보지 않는다.
-- 로그인·POST 폼 뒤 페이지, JS 로만 이동하는 게시판은 수집하지 못한다.
+- 로그인 뒤 페이지는 수집하지 못한다. POST 폼 게시판은 '함수 인자 → hidden 필드' 대입이 인라인 스크립트에 있을 때만 재현한다
+  (외부 JS 파일의 함수, 토큰·세션 검증이 있는 폼은 재현 불가).
 - 외부 사이트로 나가는 배너 링크의 목적지(1-hop)는 열어 보지 않는다(평가 환경이 폐쇄망이면 타임아웃만 쌓이고, 대상 사이트 외
   네트워크 접근을 하지 않는다는 원칙 때문). 외부 iframe 은 1단계 수집한다.
