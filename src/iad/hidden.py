@@ -215,6 +215,85 @@ def _lengths(value: str) -> list[float]:
 
 
 # ---------- 시트 ----------
+# ---------- 경량 선택자 매처(soupsieve 대신): tag.class#id[attr=val] 복합 + 후손(' ')·자식('>') 결합자 ----------
+_Compound = tuple[str | None, tuple[str, ...], str | None, tuple[tuple[str, str, str], ...]]
+_COMPOUND_RE = re.compile(r"^(\*|[a-zA-Z][\w-]*)?((?:[.#][\w-]+)*)((?:\[[^\]]+\])*)$")
+_ATTR_RE = re.compile(r"\[\s*([\w-]+)\s*(?:([~|^$*]?=)\s*(?:\"([^\"]*)\"|'([^']*)'|([^\s\]]+)))?\s*\]")
+_SPLIT_RE = re.compile(r"\s*>\s*|\s+")
+MAX_FALLBACK_SELECTS = 150   # 페이지당 soupsieve 로 푸는 미지원 선택자 수 상한(실사이트 70만자 CSS 에서 CPU 폭주 방지)
+
+
+@lru_cache(maxsize=50000)
+def _parse_selector(sel: str) -> tuple[tuple[_Compound, str], ...] | None:
+    """'div.a > ul li.b[href^=x]' → ((comp, comb), …). comb 는 각 복합 선택자와 그 오른쪽 사이의 결합자(마지막은 '')."""
+    s = sel.strip()
+    if not s or any(ch in s for ch in "+~:,()") or "::" in s:
+        return None
+    parts: list[tuple[_Compound, str]] = []
+    pos = 0
+    tokens: list[str] = []
+    combs: list[str] = []
+    for m in _SPLIT_RE.finditer(s):
+        tokens.append(s[pos:m.start()])
+        combs.append(">" if ">" in m.group(0) else " ")
+        pos = m.end()
+    tokens.append(s[pos:])
+    for i, tok in enumerate(tokens):
+        m = _COMPOUND_RE.match(tok)
+        if not m or not tok:
+            return None
+        tag = (m.group(1) or "").lower()
+        tag = None if tag in ("", "*") else tag
+        classes: list[str] = []
+        eid = None
+        for sm in re.finditer(r"([.#])([\w-]+)", m.group(2) or ""):
+            if sm.group(1) == ".":
+                classes.append(sm.group(2))
+            else:
+                eid = sm.group(2)
+        attrs = []
+        for am in _ATTR_RE.finditer(m.group(3) or ""):
+            val = am.group(3) if am.group(3) is not None else am.group(4) if am.group(4) is not None else am.group(5)
+            attrs.append((am.group(1).lower(), am.group(2) or "", val or ""))
+        parts.append(((tag, tuple(classes), eid, tuple(attrs)), combs[i] if i < len(combs) else ""))
+    return tuple(parts)
+
+
+def _compound_matches(el: Tag, comp: _Compound) -> bool:
+    tag, classes, eid, attrs = comp
+    if tag and el.name != tag:
+        return False
+    if eid and str(el.get("id")) != eid:
+        return False
+    if classes:
+        have = el.get("class") or []
+        for c in classes:
+            if c not in have:
+                return False
+    for name, op, val in attrs:
+        v = el.get(name)
+        if v is None:
+            return False
+        if isinstance(v, list):
+            v = " ".join(v)
+        v = str(v)
+        if op == "":
+            continue
+        if op == "=" and v != val:
+            return False
+        if op == "^=" and not v.startswith(val):
+            return False
+        if op == "$=" and not v.endswith(val):
+            return False
+        if op == "*=" and val not in v:
+            return False
+        if op == "~=" and val not in v.split():
+            return False
+        if op == "|=" and not (v == val or v.startswith(val + "-")):
+            return False
+    return True
+
+
 def _specificity(sel: str) -> tuple[int, int, int]:
     ids = sel.count("#")
     classes = sel.count(".") + sel.count("[")
@@ -343,30 +422,62 @@ def apply_sheet(soup: BeautifulSoup, rules: list) -> dict[int, dict[str, str]]:
         if el.get("id"):
             by_id.setdefault(str(el.get("id")), el)
 
+    def resolve_compound(comp: _Compound) -> list[Tag]:
+        tag, classes, eid, attrs = comp
+        if eid:
+            el = by_id.get(eid)
+            cand = [el] if el is not None else []
+        elif classes:
+            cand = min((by_class.get(c, []) for c in classes), key=len)
+        elif tag:
+            cand = by_tag.get(tag, [])
+        else:
+            cand = all_tags
+        return [e for e in cand if _compound_matches(e, comp)]
+
+    fallback_budget = [MAX_FALLBACK_SELECTS]
+
     def resolve(sel: str) -> list[Tag]:
-        m = _SIMPLE_SEL.match(sel)
-        if not m:
+        parsed = _parse_selector(sel)
+        if parsed is not None:
+            # 페이지에 없는 클래스·id·태그를 요구하는 복합 선택자는 바로 빈 결과(사이트 공통 CSS 대부분이 여기서 걸러진다)
+            for (tag, classes, eid, _attrs), _comb in parsed:
+                if (eid and eid not in by_id) or (tag and tag not in by_tag) or any(c not in by_class for c in classes):
+                    return []
+        if parsed is None:   # 지원하지 않는 문법(+, ~, :not 등) → soupsieve, 페이지당 횟수 상한
+            if fallback_budget[0] <= 0:
+                return []
+            fallback_budget[0] -= 1
             try:
                 return soup.select(sel)
             except Exception:
                 return []
-        tag, cls, eid = m.group("tag"), m.group("cls"), m.group("id")
-        if eid:
-            el = by_id.get(eid[1:])
-            cand = [el] if el is not None else []
-        elif cls:
-            classes = cls.split(".")[1:]
-            cand = min((by_class.get(c, []) for c in classes), key=len)
-        elif tag:
-            cand = by_tag.get(tag.lower(), [])
-        else:
-            cand = all_tags
-        if cls:
-            need = set(cls.split(".")[1:])
-            cand = [e for e in cand if need <= set(e.get("class") or [])]
-        if tag:
-            cand = [e for e in cand if e.name == tag.lower()]
-        return cand
+        # 오른쪽 복합 선택자부터 색인으로 후보를 잡고, 왼쪽은 조상 사슬을 거슬러 확인한다(후손 ' ' / 자식 '>')
+        cand = resolve_compound(parsed[-1][0])
+        if not cand or len(parsed) == 1:
+            return cand
+        out = []
+        for el in cand:
+            cur = el
+            ok = True
+            for comp, comb in reversed(parsed[:-1]):
+                # comb 는 이 comp 와 그 오른쪽 사이의 결합자
+                node = cur.parent
+                if comb == ">":
+                    if not isinstance(node, Tag) or not _compound_matches(node, comp):
+                        ok = False
+                        break
+                    cur = node
+                else:
+                    while isinstance(node, Tag) and not _compound_matches(node, comp):
+                        node = node.parent
+                    if not isinstance(node, Tag):
+                        ok = False
+                        break
+                    cur = node
+            if ok:
+                out.append(el)
+        return out
 
     cache: dict[str, list[Tag]] = {}
     for _spec, _order, sel, normal, important in ordered:

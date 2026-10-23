@@ -1,0 +1,186 @@
+{
+ "entry_url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardList.do?bbsId=BBSMSTR_000000000008",
+ "collected_at": "2026-10-23 13:41:09",
+ "pages": [
+  {
+   "file": "00.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardList.do?bbsId=BBSMSTR_000000000008",
+   "depth": 0,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 140096
+  },
+  {
+   "file": "01.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130452",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 195608
+  },
+  {
+   "file": "02.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130444",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 135888
+  },
+  {
+   "file": "03.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130426",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 183079
+  },
+  {
+   "file": "04.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130397",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 196476
+  },
+  {
+   "file": "05.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130399",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 216322
+  },
+  {
+   "file": "06.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130398",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 207140
+  },
+  {
+   "file": "07.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130396",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 523669
+  },
+  {
+   "file": "08.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130379",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 226658
+  },
+  {
+   "file": "09.html",
+   "url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardArticle.do;jsessionid=UrV8aNkuTUh2GCinC3yzDJ7VowN834l-alQxwC8-.node50?bbsId=BBSMSTR_000000000008&nttId=130382",
+   "depth": 1,
+   "css": [
+    "69845c237b.css",
+    "cedfc5139e.css",
+    "9e9de654f2.css",
+    "ef174dbf1f.css",
+    "420db16ac6.css",
+    "d4a8ce1fd8.css",
+    "f0c1d4eefa.css",
+    "5ccd14f086.css",
+    "b03364a39e.css",
+    "f0c1d4eefa.css"
+   ],
+   "bytes": 194241
+  }
+ ]
+}

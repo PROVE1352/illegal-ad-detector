@@ -96,7 +96,9 @@ def location_of(el: Tag, soup: BeautifulSoup | None = None) -> str:
         path += comb + seg
     if not path:
         return el.name
-    if soup is not None:
+    if soup is not None and " " in path.replace(" > ", ">"):
+        # 형제 순서(nth-of-type)를 붙여 만들었으므로 자식 결합자만 쓴 경로는 구성상 유일하다. 자손 결합자(table tr, tbody 생략 호환)가
+        # 끼면 중첩 표에서 겹칠 수 있어 그때만 DOM 에서 확인한다(soupsieve select 는 큰 페이지에서 수 ms 라 호출을 아낀다).
         try:
             if len(soup.select(path)) != 1:
                 path = "html > body > " + path
@@ -142,6 +144,7 @@ class PageAnalyzer:
         self.soup = BeautifulSoup(html, "lxml")
         self.sheet = H.apply_sheet(self.soup, H.sheet_rules(self.soup, page.css_texts))
         self.findings: list[Finding] = []
+        self._els: dict[int, Tag] = {}
         self.covered: set[int] = set()
         self.obf_owned: set[int] = set()   # 난독화 코드를 자기 위치에 이미 붙인 숨김 요소(자손에는 다시 붙이지 않음)
         title = self.soup.title.get_text(" ") if self.soup.title else ""
@@ -150,11 +153,23 @@ class PageAnalyzer:
 
     # ---------- 공용 ----------
     def _new(self, el: Tag) -> Finding:
+        # location(선택자 생성 + 유일성 확인)은 비싸므로 살아남은 finding 에 대해서만 _finalize 에서 계산한다
+        f = Finding(page_url=self.page.report_url, css_path="", tag=el.name, snippet=_snippet(el),
+                    html=str(el)[:800], parent_url=self.page.parent_url, is_iframe=self.page.is_iframe,
+                    external=self.page.external, location="",
+                    evidence_text=_raw_text(el), frame_url=self.page.url if self.page.is_iframe else None)
+        self._els[id(f)] = el
+        return f
+
+    def _ensure_location(self, f: Finding) -> None:
+        if f.location:
+            return
+        el = self._els.get(id(f))
+        if el is None:
+            return
         loc = location_of(el, self.soup)
-        return Finding(page_url=self.page.report_url, css_path=loc, tag=el.name, snippet=_snippet(el),
-                       html=str(el)[:800], parent_url=self.page.parent_url, is_iframe=self.page.is_iframe,
-                       external=self.page.external, location=self.page.frame_prefix + loc,
-                       evidence_text=_raw_text(el), frame_url=self.page.url if self.page.is_iframe else None)
+        f.css_path = loc
+        f.location = self.page.frame_prefix + loc
 
     def _add_keywords(self, f: Finding, text: str, allow_whitelist: bool = True) -> tuple[dict[str, float], float]:
         """키워드 근거 추가. (카테고리별 점수, 최대 단일 키워드 가중치)"""
@@ -242,6 +257,7 @@ class PageAnalyzer:
             f.category = "의심 링크"
         if not f.official and not f.extra_names:
             f.extra_names = sorted({t for t in f.techniques}) or ["SUSPICIOUS"]
+        self._ensure_location(f)
         self.findings.append(f)
 
     def _cover(self, el: Tag) -> None:
