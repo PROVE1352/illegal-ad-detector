@@ -18,10 +18,14 @@ IllegalAdDetector/
 
 | 구분 | 파일 | 크기 | 내용 |
 |---|---|---|---|
-| 제출본 | `IllegalAdDetector-windows.zip` | 약 25 MB (풀면 약 46 MB, 1,024 files) | 정적 모드 전용. Playwright 미포함. 브라우저 단계(OS Edge/Chrome headless `--dump-dom`)는 포함 |
+| 제출본 | `IllegalAdDetector-windows.zip` | 약 25 MB (풀면 약 46 MB, 1,024 files) | 정적 모드 전용. Playwright 미포함 |
 | 참고본 | `IllegalAdDetector-windows-render.zip` | 약 67 MB (풀면 약 158 MB) | Edge 렌더 비교용 Playwright 드라이버(`_internal/playwright/driver/node.exe`, 약 94 MB) 포함 |
 
-제출하는 것은 정적 전용 제출본이다. 탐지는 HTML·CSS 를 직접 받아 분석하는 정적 모드로 이루어지고, 렌더 비교는 동적 주입 링크를 추가로 찾는 선택 기능이라 용량 대비 이득이 작다. 제출본에서 렌더 옵션(`--render`, GUI 의 "Edge 렌더 비교" 체크)을 켜면 `렌더 비교 생략(playwright/Edge 사용 불가)` 로그를 남기고 정적 분석 결과로 정상 종료한다.
+제출하는 것은 정적 전용 제출본이다. 탐지는 HTML·CSS 를 직접 받아 분석하는 정적 모드로 이루어지고, 렌더 비교는 동적 주입 링크를 추가로 찾는 선택 기능이라 용량 대비 이득이 작다. 제출본에서 `--render` 를 주면 "렌더 비교를 사용할 수 없어 정적 분석 결과로 계속합니다." 로그를 남기고 정적 분석 결과로 정상 종료한다. GUI 에서는 "Edge 렌더 비교" 체크가 비활성화되고 "(이 배포본은 정적 분석 전용 — 렌더 비교 미포함)" 안내가 붙는다.
+
+렌더 비교와 별개로, 두 빌드 모두 **브라우저 단계**(src 7c9480a~)가 기본으로 켜져 있다. PC 에 설치된 Edge/Chrome 을 `--headless --dump-dom` 으로 직접 실행해 의심 스크립트 페이지만 JS 실행 후 다시 분석한다(Playwright 불필요, 결과는 ETC DYNAMIC_INJECTION 으로 result_extra.json 에만). 정책·미설치·실패·타임아웃이면 정적 결과만 쓰고, 페이지당 15초·단계 전체 5분 상한, `--no-browser` 로 끌 수 있다. 1쪽에 약 1~5초(환경에 따라) 걸린다.
+
+OCR 단계(Windows 전용)도 두 빌드 모두 기본으로 켜져 있다. 배너로 보이는 이미지를 Windows 10/11 내장 OCR(Windows.Media.Ocr)로 읽어, 광고 문구가 나오면 ETC IMAGE_TEXT_AD 로 result_extra.json 에만 보고한다. OCR 엔진이나 언어 데이터를 번들하지 않아 추가 용량은 0이고, 인식 언어는 ko → 사용자 프로필 언어 → en-US 순으로 고른다. 이미지 최대 40개(이미지당 2MB·10초), 단계 전체 120초 상한이다. 예방 캠페인 배너처럼 행정 문맥이 있으면 보고하지 않는다. OCR 을 쓸 수 없거나 실패하면 한 줄 로그를 남기고 정적 결과로 계속하며, `--no-ocr` 또는 GUI 의 "OCR(이미지 글자)" 체크 해제로 끌 수 있다.
 
 압축을 풀고 `IllegalAdDetector.exe` 를 더블클릭하면 실행된다. 설치 과정과 Python 은 필요 없다.
 
@@ -51,7 +55,8 @@ onefile 대신 onedir 을 고른 이유는 다음과 같다.
 | PyInstaller | 6.22.3 (`build/requirements-build.txt` 에 고정) |
 | pyinstaller-hooks-contrib | 2026.9 |
 | Playwright (Python) | 1.64.1, 참고본만 (`build/requirements-build-render.txt`), 브라우저는 내려받지 않음 |
-| 실행 PC 의 브라우저 | 제출본은 필요 없음. 참고본의 렌더링 모드에서만 Microsoft Edge 사용 |
+| 실행 PC 의 브라우저 | 필수 아님. Windows 11 기본 Edge 가 있으면 브라우저 단계(JS 실행 후 재분석)에 쓰고, 없으면 정적 분석만 한다. 참고본의 렌더링 모드도 Edge 사용 |
+| 실행 PC 의 OCR | 필수 아님. Windows 10/11 내장 OCR 사용(번들 없음), 없으면 OCR 단계 생략 |
 
 런타임 라이브러리는 `src/requirements.txt` (requests, beautifulsoup4, lxml) 를 따른다.
 
@@ -116,8 +121,13 @@ Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/Illeg
    * `meta`(topic, entry_url, started_at, finished_at, elapsed_sec) 와 `findings` 키 존재, 검출 1건 이상
    * `report.html` 이 한글 경로의 출력 폴더에 생성됨
    * `iad-cli.exe --demo --no-open`: exe 폴더의 `demo\` 에 result.json(같은 검사)·report.html·demo_labels.json 생성
-   * 제출본만(`-ExpectRenderFallback`): `--render` 를 줘도 종료 코드 0, `렌더 비교 생략` 안내 로그, result.json 정상 생성
+   * `--demo` 로그에 브라우저 단계 실행 또는 생략 사유가 찍히는지, 소요 시간 기록
+   * `--demo` 로그에 OCR 단계 결과(인식 이미지 수, 광고 판정 수) 또는 생략 사유가 찍히는지
+   * 제출본만(`-ExpectRenderFallback`): `--render` 를 줘도 종료 코드 0, "렌더 비교를 사용할 수 없어…" 안내 로그, result.json 정상 생성
+   * 강제 종료 내구성: `--max-pages 1000 --depth 10 --delay 1` 로 실행하고 5초 뒤 `Stop-Process -Force`(TerminateProcess) → exe 폴더 result.json 이 이번 실행에서 기록됐고 BOM 없는 유효 JSON, meta 5키 존재
+   * 요약은 `smoke_summary.txt` (artifact `smoke-output-static`)
 2. GUI: `IllegalAdDetector.exe` 를 실행해 tkinter 메인 루프까지 정상 진입하는지 확인한다. 런타임 훅이 진입 시 마커 파일을 쓰고 5초 뒤 창을 닫는다. 창이 뜨기 전에 죽거나 오류 대화상자에서 멈추면 마커가 생기지 않아 실패로 판정한다.
+3. 실행 캡처(제출본만, `build/capture_gui.ps1`): 런타임 훅 캡처 모드(`IAD_SMOKE_CAPTURE=1`)로 GUI 를 띄워 첫 화면 → 데모 버튼 실행 → 결과 화면을 System.Drawing 으로 캡처하고, exe 폴더 `demo\report.html` 을 Edge `--headless=new --screenshot` 으로 찍는다. artifact `captures-static` (capture_1~3.png)
 
 손으로 돌릴 때:
 
@@ -132,13 +142,16 @@ Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/Illeg
 
 | 항목 | 값 |
 |---|---|
-| 실행 | GitHub Actions run 39908709236 (커밋 38706a9, 2026-10-23), static·render 두 job 모두 success. 이 문서 갱신 커밋은 `[skip ci]` 로 재빌드하지 않음(코드 동일) |
-| 제출본 | `IllegalAdDetector-windows.zip` 25,171,207 bytes, 1,024 files (풀면 45,744,868 bytes) |
-| 참고본 | `IllegalAdDetector-windows-render.zip` 66,763,937 bytes |
-| 단위 테스트 | 280 passed (static·render) |
-| CLI 스모크(제출본) | PASS, 검사 59개 FAIL 0. fixtures 크롤(result.json·BOM·meta·리포트), `--demo` 9.6초, `--render` 폴백 안내, 5초 강제 종료 후 exe 폴더 result.json 유효(findings 5건, meta 5키) |
-| 브라우저 단계 | 러너 Edge 로 동작. 제출본 데모 "1쪽 렌더, 0쪽 실패, 추가 0건, 3.6s" (참고본 2.8s). 직전 run 39907685766 에서는 1쪽이 15초 상한에 걸려 정적 결과로 계속한 적이 있음 |
+| 실행 | GitHub Actions run 39910503805 (커밋 5fe2bb3, 2026-10-23), static·render 두 job 모두 success. 이 문서 갱신 커밋은 `[skip ci]` 로 재빌드하지 않음(코드 동일) |
+| 제출본 | `IllegalAdDetector-windows.zip` 25,202,348 bytes, 1,024 files (풀면 45,775,967 bytes) |
+| 참고본 | `IllegalAdDetector-windows-render.zip` 66,795,741 bytes |
+| 단위 테스트 | 285 passed (static·render) |
+| CLI 스모크(제출본) | PASS, 검사 59개 FAIL 0. fixtures 크롤(result.json·BOM·meta·리포트), `--demo` 9.3초, `--render` 폴백 안내, 5초 강제 종료 후 exe 폴더 result.json 유효(meta 5키) |
+| 브라우저 단계 | 러너 Edge 로 동작. 제출본 데모 의심 페이지 1쪽 렌더 성공, 0쪽 실패. 1쪽 약 1~5초(환경에 따라) |
 | 실행 캡처 | `build/capture_gui.ps1` 3장 (artifact `captures-static`) |
 | GUI 스모크(제출본) | PASS. mainloop 진입 후 5초 뒤 자동 종료, exit 0 |
+| 캡처 확인 | capture_1 의 "OCR(이미지 글자)" 체크와 "정적 분석 전용 배포본 / Edge 렌더 비교 미포함" 두 줄 안내가 창 안에 잘림 없이 표시됨(이미지로 확인) |
+| OCR 단계 | 러너 데모: 배너 이미지 2개 인식 0.5초. 광고 판정은 아래 실기 검증에서 확인 |
+| 실기 검증 | Windows 11 ARM64 한국어 환경에서 제출본 실행: 데모 12.5초, 4종 59/59, OCR 단계 이미지 2개 3.2초·도박 배너 1건 IMAGE_TEXT_AD 검출·예방 캠페인 배너 제외, Edge 단계 정상, 트레이스백 없음, `--no-ocr` 동작 |
 
 평가 PC 조건(요강 붙임3): Windows 11, GPU 없는 일반 PC, 검출 시간 상한 30분. CLI 기본 시간 예산은 `--time-budget 1200`(20분)이다.
