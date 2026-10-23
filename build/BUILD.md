@@ -18,7 +18,7 @@ IllegalAdDetector/
 
 | 구분 | 파일 | 크기 | 내용 |
 |---|---|---|---|
-| 제출본 | `IllegalAdDetector-windows.zip` | 약 25 MB (풀면 약 46 MB, 1,024 files) | 정적 모드 전용. Playwright 미포함 |
+| 제출본 | `IllegalAdDetector-windows.zip` | 약 25 MB (풀면 약 46 MB, 1,024 files) | 정적 모드 전용. Playwright 미포함. 브라우저 단계(OS Edge/Chrome headless `--dump-dom`)는 포함 |
 | 참고본 | `IllegalAdDetector-windows-render.zip` | 약 67 MB (풀면 약 158 MB) | Edge 렌더 비교용 Playwright 드라이버(`_internal/playwright/driver/node.exe`, 약 94 MB) 포함 |
 
 제출하는 것은 정적 전용 제출본이다. 탐지는 HTML·CSS 를 직접 받아 분석하는 정적 모드로 이루어지고, 렌더 비교는 동적 주입 링크를 추가로 찾는 선택 기능이라 용량 대비 이득이 작다. 제출본에서 렌더 옵션(`--render`, GUI 의 "Edge 렌더 비교" 체크)을 켜면 `렌더 비교 생략(playwright/Edge 사용 불가)` 로그를 남기고 정적 분석 결과로 정상 종료한다.
@@ -132,11 +132,13 @@ Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/Illeg
 
 | 항목 | 값 |
 |---|---|
-| 실행 | GitHub Actions run 39897856955 (커밋 5cbbe27, 2026-10-23), static·render 두 job 모두 success |
-| 제출본 | `IllegalAdDetector-windows.zip` 25,098,203 bytes, 1,024 files (풀면 45,672,420 bytes) |
-| 참고본 | `IllegalAdDetector-windows-render.zip` 66,691,724 bytes, 1,226 files (풀면 157,686,576 bytes) |
-| 단위 테스트 | 196 passed |
-| CLI 스모크(제출본) | PASS. fixtures 크롤 6.4초, result.json 53건(HOMOGLYPH, JAMO, OFFSCREEN, TRANSPARENT), result_extra.json 23건, BOM 없음·meta 5키 존재. `--demo` 7.3초 54건. `--render` 폴백 6.6초 53건 |
+| 실행 | GitHub Actions run 39907685766 (커밋 67cebd8, 2026-10-23), static·render 두 job 모두 success. 이 문서 갱신 커밋은 `[skip ci]` 로 재빌드하지 않음(코드 동일) |
+| 제출본 | `IllegalAdDetector-windows.zip` 25,170,056 bytes, 1,024 files (풀면 45,743,466 bytes) |
+| 참고본 | `IllegalAdDetector-windows-render.zip` 66,762,630 bytes |
+| 단위 테스트 | 278 passed (static·render) |
+| CLI 스모크(제출본) | PASS, 검사 59개 FAIL 0. fixtures 크롤(result.json·BOM·meta·리포트), `--demo` 22.7초, `--render` 폴백 안내, 5초 강제 종료 후 exe 폴더 result.json 유효(findings 5건, meta 5키) |
+| 브라우저 단계 | 러너 Edge 로 동작. 이번 제출본 런은 데모 의심 페이지 1쪽이 15초 상한에 걸려 "0쪽 렌더, 1쪽 실패, 15.9s" 후 정적 결과로 계속(참고본 런은 1쪽 렌더 2.7s, 직전 런들 제출본 3.5~5.0s) |
+| 실행 캡처 | `build/capture_gui.ps1` 3장 (artifact `captures-static`) |
 | GUI 스모크(제출본) | PASS. mainloop 진입 후 5초 뒤 자동 종료, exit 0 |
 
 평가 PC 조건(요강 붙임3): Windows 11, GPU 없는 일반 PC, 검출 시간 상한 30분. CLI 기본 시간 예산은 `--time-budget 1200`(20분)이다.
