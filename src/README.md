@@ -18,7 +18,8 @@ src/
     hidden.py         숨김 기법: inline style / <style>·외부 CSS 규칙(명시도·!important 캐스케이드, @media print 제외) /
                       속성 / 크기 / 글자색≈배경색(조상 배경·bgcolor, 배경 이미지면 판정 보류) / transform·margin·text-indent offscreen
     normalize.py      난독화 정규화(자모 합성, NFKC 전각, 유사문자, 제로폭·특수문자·이모지 제거) — 레벨별 함수
-    keywords.py       키워드 사전(도박·성인·불법금융·기타)과 화이트리스트 문맥 (.py 모듈 — 데이터 파일 불필요)
+    keywords.py       키워드 사전(도박·성인·불법금융·기타), 화이트리스트 문맥, 행정 문맥(키워드 주변 ±100자 예방·단속·신고 등)
+                      (.py 모듈 — 데이터 파일 불필요)
     links.py          링크 휴리스틱(의심 TLD, 숫자 도메인, 단축 URL, 텔레그램/오픈채팅, 앵커-도메인 불일치, 대량 외부링크)
     scripts.py        document.write/innerHTML 링크 주입, eval·base64, meta refresh, JS 리다이렉트
     official.py       요강 붙임4 스키마 result.json / result_extra.json 작성
@@ -69,6 +70,11 @@ uv run pytest -q
 visibility:hidden, hidden 속성, 1×1 크기/clip, marquee, noscript, HTML 주석, 숨김 + 링크만(키워드 없음) 등 요강 정의가
 불명확한 것은 result.json 에 넣지 않고 result_extra.json 으로 보낸다. 요소 위치는 숨김 스타일이 걸린 요소(4종 중
 TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으면 그 부모), 난독화 텍스트를 품은 가장 안쪽 요소(HOMOGLYPH/JAMO)다.
+
+행정 안내문 제외 규칙(AR2): 보이는 텍스트의 불법 키워드 주변 ±100자(정규화 문자열)에 예방·단속·적발·주의보·1336·상담·교육·신고 등
+행정 문맥이 합계 -2 이하로 있고, 의심 링크·은닉·스크립트·난독화 근거가 없으면 보고하지 않는다. 난독화(자모·유사문자·제로폭)가 있으면
+정상 문맥 감점을 절반만 적용한다(난독화된 안내문은 없다). 접근성 숨김(.sr-only/.blind/skip-link)의 정상 텍스트·공공기관 링크는
+키워드가 없으므로 4종은 물론 ETC 에도 올리지 않으며, 숨긴 요소 안 링크는 비신뢰 도메인일 때만 HIDDEN_EXTERNAL_LINK 로 보고한다.
 
 스타일 해석 규칙: 인라인 style, 문서 `<style>`, 동일 사이트 외부 CSS(`<link rel=stylesheet>`·`@import` 1단계)를 모두 읽고
 (!important, 명시도, 선언 순서) 순으로 캐스케이드한다. 의사클래스(:hover 등) 선택자와 `@media print` 블록은 적용하지 않는다.

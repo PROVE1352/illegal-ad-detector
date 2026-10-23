@@ -122,8 +122,50 @@ def match_keywords(text: str) -> dict[str, list[tuple[str, float, bool]]]:
     return {cat: [(k, w, lv != LEVEL_PLAIN) for k, w, lv in hits] for cat, hits in match_keywords_levels(text).items()}
 
 
-def match_whitelist(text: str) -> list[tuple[str, float]]:
+# 행정 문맥(예방·단속·신고 안내)에서 흔한 표현. 키워드 주변 ±window 안에 있으면 '안내문' 으로 본다.
+ADMIN_CONTEXT: list[tuple[str, float]] = [
+    ("예방", -2), ("단속", -2), ("적발", -2), ("주의보", -2), ("1336", -3), ("상담", -1), ("교육", -1.5), ("신고", -1.5),
+    ("차단", -1.5), ("처벌", -2), ("수사", -1.5), ("검거", -2), ("근절", -2), ("캠페인", -2), ("피해", -1.5), ("위반", -1.5),
+    ("안내", -0.5), ("홍보", -1), ("법률", -1), ("조례", -1.5), ("보도자료", -1.5), ("경찰", -1), ("유해", -1.5), ("중독", -2),
+]
+_NORM_ADMIN: list[tuple[str, str, float]] | None = None
+
+
+def match_whitelist(text: str, window: int | None = None) -> list[tuple[str, float]]:
+    """화이트리스트 문맥 매칭. window 를 주면 '불법 키워드 주변 ±window 자(정규화 문자열 기준)' 안의 행정 문맥만 센다."""
+    global _NORM_ADMIN
     _prepare()
-    assert _NORM_WHITELIST is not None
+    assert _NORM is not None and _NORM_WHITELIST is not None
+    if _NORM_ADMIN is None:
+        _NORM_ADMIN = [(aggressive(k), k, w) for k, w in ADMIN_CONTEXT]
     norm = aggressive(text)
-    return [(orig, w) for nk, orig, w in _NORM_WHITELIST if nk in norm]
+    out = [(orig, w) for nk, orig, w in _NORM_WHITELIST if nk in norm]
+    if window is None:
+        return out
+    spans: list[tuple[int, int]] = []
+    for items in _NORM.values():
+        for _p, _j, _h, k_full, _o, w in items:
+            if w < 1.0 or not k_full:
+                continue
+            start = 0
+            while True:
+                i = norm.find(k_full, start)
+                if i < 0:
+                    break
+                spans.append((max(0, i - window), i + len(k_full) + window))
+                start = i + 1
+    if not spans:
+        return out
+    seen = {o for o, _ in out}
+    for a, b in spans:
+        win = norm[a:b]
+        for nk, orig, w in _NORM_ADMIN:
+            if orig not in seen and nk in win:
+                seen.add(orig)
+                out.append((orig, w))
+    return out
+
+
+def admin_context_score(text: str, window: int = 100) -> float:
+    """불법 키워드 주변의 행정 문맥 총점(음수일수록 안내문에 가깝다)."""
+    return sum(w for _, w in match_whitelist(text, window=window))

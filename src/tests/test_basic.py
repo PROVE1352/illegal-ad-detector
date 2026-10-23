@@ -235,3 +235,32 @@ def test_crawler_collects_same_site_css(tmp_path):
     c.css_cache["http://ex.go.kr/s.css"] = ".h{display:none}"
     soup = BeautifulSoup('<html><head><link rel="stylesheet" href="/s.css"><link rel="stylesheet" href="http://cdn.x.com/b.css"></head></html>', "lxml")
     assert c.stylesheets(Page(url="http://ex.go.kr/a.html", html=""), soup) == [".h{display:none}"]
+
+
+# ---------- AR2: 행정 문맥 화이트리스트 / 접근성 숨김 ----------
+@pytest.mark.parametrize("html", [
+    '<p>불법 토토사이트 광고 집중 단속 결과 32건 적발, 운영자 검거</p>',
+    '<td>온라인 카지노사이트 접속 차단 및 도박 중독 예방 교육 실시</td>',
+    '<p>출장안마 등 성매매 알선 광고 신고는 112, 피해 상담 1366</p>',
+    '<a class="skip-nav" style="position:absolute;left:-9999px" href="#content">본문 바로가기</a>',
+    '<span class="blind">새 창 열림 <a href="https://www.gov.kr">정부24</a></span>',
+    '<p class="sr-only" style="position:absolute;left:-9999px">현재 페이지 <a href="https://www.mois.go.kr">행정안전부</a></p>',
+])
+def test_admin_context_and_a11y_hidden_not_reported(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><head><style>.blind{{position:absolute;left:-9999px}}</style></head><body>{html}</body></html>"), "ex.go.kr")
+    assert not fs, [(f.location, f.official, f.extra_names, f.score) for f in fs]
+
+
+@pytest.mark.parametrize("html,code", [
+    ('<p>ㅌㅗㅌㅗ ㅅㅏㅇㅣㅌㅡ 추천 (예방 단속 신고 안내 아님)</p>', "JAMO"),          # 난독화는 행정 문맥으로 면제 안 됨
+    ('<p>단속 안내: <span style="display:none">토토사이트 안전놀이터 가입코드</span></p>', "OFFSCREEN"),   # 은닉은 면제 안 됨
+])
+def test_admin_context_does_not_excuse_obfuscation_or_hiding(html, code):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert code in {c for f in fs for c in f.official}
+
+
+def test_admin_context_keeps_suspicious_link():
+    html = '<p>불법 도박 단속 안내 <a href="http://kk8282.top">토토사이트 안전놀이터 바로가기</a></p>'
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert any("SUSPICIOUS_TLD" in n or "suspicious_tld" in n for f in fs for n in f.extra_names), fs

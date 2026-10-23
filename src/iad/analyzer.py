@@ -12,7 +12,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 from . import hidden as H
-from .keywords import CATEGORY_LABEL, LEVEL_PLAIN, match_keywords_levels, match_whitelist
+from .keywords import CATEGORY_LABEL, LEVEL_PLAIN, admin_context_score, match_keywords_levels, match_whitelist
 from .links import analyze_link, find_urls_in_text, host_of, is_same_site, is_trusted
 from .models import Finding, Page
 from .normalize import collapse_spaces, has_composable_jamo, has_homoglyph_chars
@@ -39,6 +39,8 @@ OFFICIAL_MAP = {
 }
 THRESHOLD = 3.0
 MASS_LINK_MIN = 5
+ADMIN_WINDOW = 100          # 행정 문맥 판정 창(키워드 주변 ±자)
+ADMIN_EXCLUDE = -2.0        # 창 안 행정 문맥 점수가 이 이하이고 의심 링크·은닉·난독화가 없으면 안내문으로 보고 제외
 OFFICIAL_MIN_KEYWORD = 2.0   # 4종에 넣기 위한 최소 키워드 가중치(오탐이 정확도 감점이므로 보수적으로)
 
 
@@ -148,9 +150,11 @@ class PageAnalyzer:
                     total += 1.5
             cats[cat] = min(total, 8.0)
         if cats and allow_whitelist:
-            wl = match_whitelist(text)
+            wl = match_whitelist(text, window=ADMIN_WINDOW)
+            obf = any(e.rule == "keyword.obfuscated" for e in f.evidence)
             for kw, w in wl[:6]:
-                f.add("context.whitelist", f"정상 문맥 '{kw}'", w, "context")
+                # 고의 난독화(자모·유사문자·제로폭)가 있으면 정상 문맥 감점을 절반만 적용(난독화된 안내문은 없다)
+                f.add("context.whitelist", f"정상 문맥 '{kw}'" + (" (난독화로 감점 절반)" if obf else ""), w / 2 if obf else w, "context")
             if not wl:
                 for kw, w in match_whitelist(self.page_context)[:3]:
                     f.add("context.whitelist_page", f"페이지 제목 문맥 '{kw}'", w * 0.5, "context")
@@ -287,7 +291,7 @@ class PageAnalyzer:
             cats, _ = self._add_keywords(f, text, allow_whitelist=False)
             if inner:
                 self._add_links(f, inner, raw)
-            if f.links and not f.has_group("keyword"):
+            if any(not is_trusted(host_of(u)) for u in f.links) and not f.has_group("keyword"):
                 f.add("link.hidden_external", "noscript 안의 외부 링크", 1.5, "link")
             self._cover(ns)
             self._finalize(f, cats)
@@ -386,8 +390,12 @@ class PageAnalyzer:
                 f.techniques.append(tech)
         cats, max_w = self._add_keywords(f, text, allow_whitelist=False)
         self._add_links(f, el, text)
-        if f.links and not f.has_group("keyword"):
-            f.add("link.hidden_external", "숨긴 요소 안의 외부 링크", 1.5, "link")
+        untrusted = [u for u in f.links if not is_trusted(host_of(u))]
+        if untrusted and not f.has_group("keyword"):
+            # 접근성 숨김(.sr-only/.blind/skip-link) 안의 공공기관 링크는 정상이므로 비신뢰 도메인 링크만 근거로 삼는다
+            f.add("link.hidden_external", f"숨긴 요소 안의 외부 링크 ({host_of(untrusted[0])})", 1.5, "link")
+            if "HIDDEN_EXTERNAL_LINK" not in f.extra_names:
+                f.extra_names.append("HIDDEN_EXTERNAL_LINK")
         # 요강 4종 판정: 숨김 기법이 4종에 해당하고 불법 키워드가 충분히 강할 때만.
         # 숨긴 탭/아코디언 안의 정상 안내문(카지노 관광 안내 등)은 화이트리스트 문맥이 강하면 제외.
         wl_total = sum(w for _, w in match_whitelist(text))
@@ -405,6 +413,14 @@ class PageAnalyzer:
                     f.extra_names.append(name)
         self._finalize(f, cats)
 
+    def _is_admin_notice(self, f: Finding, text: str) -> bool:
+        """행정 안내문 판정: 키워드 주변 ±100자에 예방·단속·신고 등 문맥이 있고, 의심 링크·은닉·난독화가 없다."""
+        if not f.has_group("keyword") or f.has_group("link") or f.has_group("hidden") or f.has_group("script"):
+            return False
+        if any(e.rule == "keyword.obfuscated" for e in f.evidence):
+            return False
+        return admin_context_score(text, ADMIN_WINDOW) <= ADMIN_EXCLUDE
+
     def _visible_anchor(self, a: Tag) -> None:
         text = a.get_text(" ")
         f = self._new(a)
@@ -412,6 +428,8 @@ class PageAnalyzer:
         cats, _ = self._add_keywords(f, text + " " + str(a.get("title", "")))
         if f.has_group("link") and f.has_group("keyword"):
             f.add("combo.keyword_link", "의심 링크 + 키워드 동시 출현", 1.5, "link")
+        if self._is_admin_notice(f, text + " " + _direct_text(a.parent) if isinstance(a.parent, Tag) else text):
+            return
         self._finalize(f, cats)
 
     def _visible_text(self, el: Tag) -> None:
@@ -427,6 +445,8 @@ class PageAnalyzer:
             self._link_rules(f, u, "")
         if f.has_group("link") and f.has_group("keyword"):
             f.add("combo.keyword_link", "의심 링크 + 키워드 동시 출현", 1.5, "link")
+        if self._is_admin_notice(f, text):
+            return
         self._finalize(f, cats)
 
     # ---------- HOMOGLYPH / JAMO ----------
