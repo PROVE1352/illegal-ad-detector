@@ -37,6 +37,17 @@ OFFICIAL_MAP = {
     "display_none": "OFFSCREEN", "font_size_zero": "OFFSCREEN", "offscreen": "OFFSCREEN",
     "color_match": "TRANSPARENT", "opacity_zero": "TRANSPARENT",
 }
+# 은닉 기법이 겹칠 때(display:none + color:#fff 등) 보고할 하나를 고르는 지배 순서: 렌더링 자체를 없애는 것 > 화면 밖 > 글자 크기 0 > 투명
+HIDE_DOMINANCE = ["display_none", "offscreen", "font_size_zero", "color_match", "opacity_zero"]
+
+
+def dominant_official(techs: list[tuple[str, str]]) -> str | None:
+    """겹친 은닉 기법 중 지배적인 하나의 요강 코드. 없으면 None."""
+    names = {t for t, _ in techs}
+    for t in HIDE_DOMINANCE:
+        if t in names:
+            return OFFICIAL_MAP[t]
+    return None
 THRESHOLD = 3.0
 MASS_LINK_MIN = 5
 ADMIN_WINDOW = 100          # 행정 문맥 판정 창(키워드 주변 ±자)
@@ -404,10 +415,11 @@ class PageAnalyzer:
         obfuscated = "obfuscation" in f.techniques   # 숨김 + 난독화가 겹치면 약한 키워드(카지노 1.5)도 고의성이 충분
         strong = max_w >= OFFICIAL_MIN_KEYWORD or (obfuscated and max_w >= 1.0)
         if cats and strong and not (wl_total <= -3 and max_w < 3):
-            for tech, _ in techs:
-                code = OFFICIAL_MAP.get(tech)
-                if code and code not in f.official:
-                    f.official.append(code)
+            # 은닉 기법끼리 겹치면 지배적인 하나만(요강: finding 당 technique 1개). 난독화(JAMO/HOMOGLYPH)는
+            # _obfuscation_pass 가 같은 location 에 따로 붙여 두 finding 이 된다(채점자가 어느 라벨을 붙였을지 모르므로 둘 다 제출).
+            code = dominant_official(techs)
+            if code and code not in f.official:
+                f.official.append(code)
         for tech, _ in techs:
             if tech not in OFFICIAL_MAP:
                 name = "HIDDEN_" + tech.upper()

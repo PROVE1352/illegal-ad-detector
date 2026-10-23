@@ -500,3 +500,20 @@ def test_mixed_script_homoglyph_detected(text):
 def test_mixed_script_hard_negatives(text):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body><p>{text}</p></body></html>"), "ex.go.kr")
     assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+# ---------- AR7: 겹침 이중 보고 ----------
+def test_overlap_reporting_rules():
+    html = ('<html><body>'
+            '<span class="a" style="display:none;color:#fff">토토사이트 안전놀이터</span>'                  # 은닉끼리 겹침 → OFFSCREEN 하나만
+            '<span class="b" style="opacity:0;position:absolute;left:-9999px">바카라 온라인카지노</span>'   # → OFFSCREEN(지배)
+            '<span class="c" style="color:#fff">ㅌㅗㅌㅗ ㅅㅏㅇㅣㅌㅡ 가입코드 777</span>'                 # 은닉 + 난독화 → 둘 다
+            '<span class="d" style="display:none">ｃａｓｉｎｏ 바카라 보증업체</span>'                     # 은닉 + 난독화 → 둘 다
+            '</body></html>')
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=html), "ex.go.kr")
+    by = {f.location: set(f.official) for f in fs if f.official}
+    assert by["span.a"] == {"OFFSCREEN"} and by["span.b"] == {"OFFSCREEN"}
+    assert by["span.c"] == {"TRANSPARENT", "JAMO"} and by["span.d"] == {"OFFSCREEN", "HOMOGLYPH"}
+    off = build_official(fs)
+    units = {(o["location"], o["technique"]) for o in off}
+    assert ("span.c", "TRANSPARENT") in units and ("span.c", "JAMO") in units and len(off) == 6
