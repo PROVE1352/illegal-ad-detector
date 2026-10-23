@@ -360,6 +360,24 @@ class Site:
         for eid, cat in ((s1, "도박"), (s2, "도박"), (s3, "성인"), (s4, "불법금융"), (s5, "불법금융"), (s6, "도박")):
             self.label("post/post_r3.html", eid, "OFFSCREEN", cat)
 
+        # 레드팀 R3 버그 재현: B1 같은 요소 color=background(외부 CSS 클래스), B2 숨김 클래스+자모 분해(같은 위치 2건),
+        # B3 첫가끝(NFD) 키워드, B4 IDN 호모그래프 도메인 + 정상 러시아어·한글 IDN 링크 하드 네거티브
+        import unicodedata as _ud
+        u1, u2, u3, u4 = (self.nid() for _ in range(4))
+        self.files["css/site.css"] += " .same{color:#ffffff;background:#ffffff} .h-dn{display:none} "
+        add("post/post_r4.html", "자매도시 교류 행사 안내",
+            f'<p>자매도시 대표단 방문 행사: 시청 대강당. 참고: <a href="http://москва.рф">모스크바시</a>, <a href="http://행복시.한국">행복시</a></p>'
+            f'<p class="same" id="{u1}">{"토토사이트 안전놀이터 추천" if not v else "메이저놀이터 먹튀검증 추천"}</p>'
+            f'<p class="h-dn" id="{u2}"><b>{"ㅂㅏㅋㅏㄹㅏ ㅌㅗㅌㅗ" if not v else "ㅋㅏㅈㅣㄴㅗ ㅅㅡㄹㄹㅗㅅ"}</b> 추천</p>'
+            f'<p id="{u3}">문의 {_ud.normalize("NFD", "카지노 바카라" if not v else "토토사이트 슬롯")} 코드 777</p>'
+            f'<p>{"토토사이트" if not v else "바카라"} 추천 <a id="{u4}" href="http://{"ѕо" if not v else "βο"}.invalid/go">바로가기</a></p>', ["감사합니다"],
+            head='<link rel="stylesheet" href="../css/site.css">')
+        self.label("post/post_r4.html", u1, "TRANSPARENT", "도박")
+        self.label("post/post_r4.html", u2, "OFFSCREEN", "도박")
+        self.label("post/post_r4.html", u2, "JAMO", "도박")
+        self.label("post/post_r4.html", u3, "JAMO", "도박")
+        self.label("post/post_r4.html", u4, "HOMOGLYPH", "도박")
+
         # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
         k1 = self.nid()
         normal_body = "<p>시민 제안 공모를 안내합니다. 접수: 10/20~11/5</p>"

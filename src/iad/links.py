@@ -88,3 +88,44 @@ def analyze_link(href: str, anchor_text: str, base_host: str) -> list[tuple[str,
 
 def find_urls_in_text(text: str) -> list[str]:
     return re.findall(r"https?://[^\s\"'<>)\]]+", text or "")
+
+
+# ---------- IDN 호모그래프 ----------
+_CYR = re.compile("[\u0400-\u04ff]")
+_GRK = re.compile("[\u0370-\u03ff]")
+_LAT = re.compile("[a-z]")
+_HOSTLIKE = re.compile(r"(?<![\w@/])((?:[\w\u0400-\u04ff\u0370-\u03ff-]{1,63}\.)+[a-z\u0400-\u04ff\u0370-\u03ff\uac00-\ud7a3]{2,24})(?![\w])", re.I)
+
+
+def _decode_punycode(host: str) -> str:
+    if "xn--" not in host:
+        return host
+    try:
+        return host.encode("ascii").decode("idna")
+    except (UnicodeError, ValueError):
+        return host
+
+
+def is_idn_homograph(host: str) -> bool:
+    """도메인 레이블에 라틴처럼 보이는 키릴·그리스 문자가 라틴과 섞여 있으면(레이블 안 혼용, 또는 비라틴 레이블 + 라틴 TLD) True.
+    호스트 전체가 한 스크립트(москва.рф, παράδειγμα.ελ)거나 한글 IDN(행복시.한국)이면 False."""
+    h = _decode_punycode((host or "").lower().strip("."))
+    if not h or "." not in h:
+        return False
+    labels = h.split(".")
+    has_lat = any(_LAT.search(l) for l in labels)
+    has_conf = any(_CYR.search(l) or _GRK.search(l) for l in labels)
+    return has_lat and has_conf
+
+
+def idn_homograph_hosts(text: str, hosts: list[str]) -> list[str]:
+    """href 호스트 목록 + 텍스트 속 도메인 토큰 중 IDN 호모그래프인 것."""
+    out: list[str] = []
+    for h in hosts:
+        if h and is_idn_homograph(h) and h not in out:
+            out.append(h)
+    for m in _HOSTLIKE.finditer(text or ""):
+        cand = m.group(1).lower()
+        if is_idn_homograph(cand) and cand not in out:
+            out.append(cand)
+    return out

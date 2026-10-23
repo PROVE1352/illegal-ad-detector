@@ -1,44 +1,44 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 12:48:08",
+  "timestamp": "2026-10-23 12:48:12",
   "depth": 3,
   "max_pages": 300,
-  "port": 50644
+  "port": 50952
  },
  "results": [
   {
    "set": "dev",
-   "entry_url": "http://127.0.0.1:50644/dev/index.html",
-   "pages_crawled": 30,
-   "elapsed_sec": 0.23,
-   "tool_elapsed_sec": 0.224536,
+   "entry_url": "http://127.0.0.1:50952/dev/index.html",
+   "pages_crawled": 31,
+   "elapsed_sec": 0.25,
+   "tool_elapsed_sec": 0.239949,
    "official": {
-    "gold": 49,
-    "reported_units": 49,
-    "tp": 49,
+    "gold": 54,
+    "reported_units": 54,
+    "tp": 54,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
     "f1": 1.0,
     "per_technique": {
      "HOMOGLYPH": {
-      "gold": 11,
-      "hit": 11,
+      "gold": 12,
+      "hit": 12,
       "recall": 1.0
      },
      "JAMO": {
-      "gold": 7,
-      "hit": 7,
+      "gold": 9,
+      "hit": 9,
       "recall": 1.0
      },
      "TRANSPARENT": {
-      "gold": 11,
-      "hit": 11,
+      "gold": 12,
+      "hit": 12,
       "recall": 1.0
      },
      "OFFSCREEN": {
-      "gold": 20,
-      "hit": 20,
+      "gold": 21,
+      "hit": 21,
       "recall": 1.0
      }
     },
@@ -48,15 +48,15 @@
    },
    "extra": {
     "gold": 16,
-    "reported": 17,
+    "reported": 18,
     "hit": 16,
     "recall": 1.0,
     "false_positives": [
      {
-      "id": "f_008",
-      "url": "http://127.0.0.1:50644/dev/post/post_library.html",
+      "id": "f_014",
+      "url": "http://127.0.0.1:50952/dev/post/post_library.html",
       "is_violation": true,
-      "location": "iframe[src=\"http://localhost:50644/dev/ext/px.html\"] >>> a",
+      "location": "iframe[src=\"http://localhost:50952/dev/ext/px.html\"] >>> a",
       "evidence_text": "go  [근거: 의심 TLD .top (777.top); 숫자가 많은 도메인 (777.top)]",
       "technique": "ETC",
       "extra_finding": "numeric_domain+suspicious_tld / 분류=의심 링크 / 위험도=낮음 / 점수=4.5",
@@ -68,41 +68,41 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_7cp3jfbp"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_72be8lhi"
   },
   {
    "set": "holdout",
-   "entry_url": "http://127.0.0.1:50644/holdout/index.html",
-   "pages_crawled": 30,
-   "elapsed_sec": 0.16,
-   "tool_elapsed_sec": 0.157979,
+   "entry_url": "http://127.0.0.1:50952/holdout/index.html",
+   "pages_crawled": 31,
+   "elapsed_sec": 0.17,
+   "tool_elapsed_sec": 0.168041,
    "official": {
-    "gold": 49,
-    "reported_units": 49,
-    "tp": 49,
+    "gold": 54,
+    "reported_units": 54,
+    "tp": 54,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
     "f1": 1.0,
     "per_technique": {
      "HOMOGLYPH": {
-      "gold": 11,
-      "hit": 11,
+      "gold": 12,
+      "hit": 12,
       "recall": 1.0
      },
      "JAMO": {
-      "gold": 7,
-      "hit": 7,
+      "gold": 9,
+      "hit": 9,
       "recall": 1.0
      },
      "TRANSPARENT": {
-      "gold": 11,
-      "hit": 11,
+      "gold": 12,
+      "hit": 12,
       "recall": 1.0
      },
      "OFFSCREEN": {
-      "gold": 20,
-      "hit": 20,
+      "gold": 21,
+      "hit": 21,
       "recall": 1.0
      }
     },
@@ -112,15 +112,15 @@
    },
    "extra": {
     "gold": 16,
-    "reported": 17,
+    "reported": 18,
     "hit": 16,
     "recall": 1.0,
     "false_positives": [
      {
       "id": "f_008",
-      "url": "http://127.0.0.1:50644/holdout/post/post_library.html",
+      "url": "http://127.0.0.1:50952/holdout/post/post_library.html",
       "is_violation": true,
-      "location": "iframe[src=\"http://localhost:50644/holdout/ext/px.html\"] >>> a",
+      "location": "iframe[src=\"http://localhost:50952/holdout/ext/px.html\"] >>> a",
       "evidence_text": "go  [근거: 의심 TLD .xyz (777.xyz); 숫자가 많은 도메인 (777.xyz)]",
       "technique": "ETC",
       "extra_finding": "numeric_domain+suspicious_tld / 분류=의심 링크 / 위험도=낮음 / 점수=4.5",
@@ -132,7 +132,7 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_7u09wm9f"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_ri_wrrad"
   }
  ]
 }

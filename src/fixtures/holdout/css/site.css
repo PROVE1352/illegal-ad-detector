@@ -10,3 +10,4 @@
 .tabpane.active{display:block}
 @media print{.no-print{display:none}}
 .hero{background:url(bg.png) no-repeat;color:#fff;padding:20px}
+ .same{color:#ffffff;background:#ffffff} .h-dn{display:none} 

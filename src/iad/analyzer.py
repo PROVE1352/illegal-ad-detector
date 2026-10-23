@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 from . import hidden as H
 from .keywords import CATEGORY_LABEL, LEVEL_PLAIN, admin_context_score, match_keywords_levels, match_whitelist
-from .links import analyze_link, find_urls_in_text, host_of, is_same_site, is_trusted
+from .links import analyze_link, find_urls_in_text, host_of, idn_homograph_hosts, is_same_site, is_trusted
 from .models import Finding, Page
 from .normalize import collapse_spaces, has_composable_jamo, has_homoglyph_chars
 from .scripts import analyze_meta_refresh, analyze_script
@@ -201,6 +201,18 @@ class PageAnalyzer:
             if not is_same_site(u, self.base_host):
                 f.links.append(u)
             self._link_rules(f, u, "")
+
+    def _idn_homograph(self, f: Finding, el: Tag | None, text: str) -> None:
+        """링크 href·텍스트 속 도메인 레이블에 라틴처럼 보이는 키릴·그리스 문자가 섞여 있으면(IDN 호모그래프) HOMOGLYPH 근거."""
+        hosts: list[str] = []
+        if el is not None:
+            anchors = [el] if el.name == "a" else el.find_all("a", href=True)
+            hosts += [host_of(urljoin(self.page.url, str(a.get("href", "")))) for a in anchors]
+        hits = idn_homograph_hosts(text, hosts)
+        if hits:
+            f.add("link.idn_homograph", "도메인에 라틴 유사 키릴·그리스 문자 혼용(IDN 호모그래프): " + ", ".join(hits[:3]), 3.0, "link")
+            if "idn_homograph" not in f.techniques:
+                f.techniques.append("idn_homograph")
 
     def _link_rules(self, f: Finding, href: str, anchor_text: str) -> None:
         for rule, detail, w in analyze_link(href, anchor_text, self.base_host):
@@ -415,6 +427,7 @@ class PageAnalyzer:
                 f.techniques.append(tech)
         cats, max_w = self._add_keywords(f, text, allow_whitelist=False)
         self._add_links(f, el, text)
+        self._idn_homograph(f, el, text)
         untrusted = [u for u in f.links if not is_trusted(host_of(u))]
         if untrusted and not f.has_group("keyword"):
             # 접근성 숨김(.sr-only/.blind/skip-link) 안의 공공기관 링크는 정상이므로 비신뢰 도메인 링크만 근거로 삼는다
@@ -444,6 +457,8 @@ class PageAnalyzer:
                         f.techniques.append(oc)
             if obf_codes:
                 self.obf_owned.add(id(el))
+            if "idn_homograph" in f.techniques and "HOMOGLYPH" not in f.official:
+                f.official.append("HOMOGLYPH")
         for tech, _ in techs:
             if tech not in OFFICIAL_MAP:
                 name = "HIDDEN_" + tech.upper()
@@ -463,12 +478,23 @@ class PageAnalyzer:
         text = a.get_text(" ")
         f = self._new(a)
         self._add_links(f, a, "")
-        cats, _ = self._add_keywords(f, text + " " + str(a.get("title", "")))
+        cats, max_w = self._add_keywords(f, text + " " + str(a.get("title", "")))
+        self._idn_homograph(f, a, text)
         if f.has_group("link") and f.has_group("keyword"):
             f.add("combo.keyword_link", "의심 링크 + 키워드 동시 출현", 1.5, "link")
+        if "idn_homograph" in f.techniques and (cats and max_w >= 1.0 or self._parent_has_keyword(a)):
+            f.official.append("HOMOGLYPH")
         if self._is_admin_notice(f, text + " " + _direct_text(a.parent) if isinstance(a.parent, Tag) else text):
             return
         self._finalize(f, cats)
+
+    def _parent_has_keyword(self, el: Tag) -> bool:
+        """링크 자체엔 키워드가 없어도 같은 블록(부모 p/li/td/div)의 텍스트에 키워드가 있으면 True."""
+        par = el.parent
+        if isinstance(par, Tag) and par.name in CONTAINER_TAGS | {"span", "li", "td", "th", "dd"}:
+            hits = match_keywords_levels(par.get_text(" "))
+            return any(w >= 1.0 for hs in hits.values() for _, w, _ in hs)
+        return False
 
     def _visible_text(self, el: Tag) -> None:
         text = _direct_text(el)
@@ -476,13 +502,16 @@ class PageAnalyzer:
             return
         f = self._new(el)
         f.evidence_text = text[:500]
-        cats, _ = self._add_keywords(f, text)
+        cats, max_w = self._add_keywords(f, text)
         for u in find_urls_in_text(text):
             if not is_same_site(u, self.base_host):
                 f.links.append(u)
             self._link_rules(f, u, "")
+        self._idn_homograph(f, None, text)
         if f.has_group("link") and f.has_group("keyword"):
             f.add("combo.keyword_link", "의심 링크 + 키워드 동시 출현", 1.5, "link")
+        if "idn_homograph" in f.techniques and cats and max_w >= 1.0:
+            f.official.append("HOMOGLYPH")
         if self._is_admin_notice(f, text):
             return
         self._finalize(f, cats)

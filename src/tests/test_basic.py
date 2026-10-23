@@ -618,3 +618,33 @@ def test_nfd_whole_page_is_encoding_not_obfuscation():
     page = unicodedata.normalize("NFD", "<html><body><h1>행복시청 공지</h1><p>도박 중독 예방 상담 1336 안내문입니다.</p><p>불법 토토사이트 광고 단속 결과</p></body></html>")
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=page), "ex.go.kr")
     assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+
+# ---------- B4: IDN 호모그래프 도메인 ----------
+def test_idn_homograph_rules():
+    from iad.links import is_idn_homograph
+    assert is_idn_homograph("ѕо.invalid") and is_idn_homograph("βο.invalid") and is_idn_homograph("www.саsino-vip.com")
+    assert is_idn_homograph("xn--80ak6aa92e.com")          # аррӏе.com
+    assert not is_idn_homograph("москва.рф") and not is_idn_homograph("행복시.한국") and not is_idn_homograph("παράδειγμα.ελ")
+    assert not is_idn_homograph("kk8282.top") and not is_idn_homograph("www.mois.go.kr")
+
+
+@pytest.mark.parametrize("html,loc", [
+    ('<p>토토사이트 추천 <a href="http://ѕо.invalid/x">바로가기</a></p>', "p > a"),
+    ('<p style="display:none">안전놀이터 βο.invalid</p>', "p"),
+    ('<p>카지노 <a href="http://www.саsino-vip.com">입장</a></p>', "p > a"),
+    ('<div style="display:none"><a href="http://ѕо.invalid">바카라</a></div>', "div"),
+])
+def test_idn_homograph_is_homoglyph(html, loc):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert any(f.location == loc and "HOMOGLYPH" in f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+@pytest.mark.parametrize("html", [
+    '<p>토토사이트 단속 <a href="http://москва.рф">모스크바시</a></p>', '<p>한글도메인 <a href="http://행복시.한국">행복시</a> 안내</p>',
+    '<p>자매도시 <a href="http://москва.рф">Москва</a></p>', '<p>국제교류 <a href="http://ѕо.invalid">자매도시</a></p>',   # 키워드 없음
+])
+def test_idn_homograph_negatives(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert not any("HOMOGLYPH" in f.official for f in fs), [(f.location, f.official) for f in fs]
