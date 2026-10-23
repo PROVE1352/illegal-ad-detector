@@ -132,12 +132,12 @@ Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/Illeg
 
 | 항목 | 값 |
 |---|---|
-| 실행 | GitHub Actions run 39907685766 (커밋 67cebd8, 2026-10-23), static·render 두 job 모두 success. 이 문서 갱신 커밋은 `[skip ci]` 로 재빌드하지 않음(코드 동일) |
-| 제출본 | `IllegalAdDetector-windows.zip` 25,170,056 bytes, 1,024 files (풀면 45,743,466 bytes) |
-| 참고본 | `IllegalAdDetector-windows-render.zip` 66,762,630 bytes |
-| 단위 테스트 | 278 passed (static·render) |
-| CLI 스모크(제출본) | PASS, 검사 59개 FAIL 0. fixtures 크롤(result.json·BOM·meta·리포트), `--demo` 22.7초, `--render` 폴백 안내, 5초 강제 종료 후 exe 폴더 result.json 유효(findings 5건, meta 5키) |
-| 브라우저 단계 | 러너 Edge 로 동작. 이번 제출본 런은 데모 의심 페이지 1쪽이 15초 상한에 걸려 "0쪽 렌더, 1쪽 실패, 15.9s" 후 정적 결과로 계속(참고본 런은 1쪽 렌더 2.7s, 직전 런들 제출본 3.5~5.0s) |
+| 실행 | GitHub Actions run 39908709236 (커밋 38706a9, 2026-10-23), static·render 두 job 모두 success. 이 문서 갱신 커밋은 `[skip ci]` 로 재빌드하지 않음(코드 동일) |
+| 제출본 | `IllegalAdDetector-windows.zip` 25,171,207 bytes, 1,024 files (풀면 45,744,868 bytes) |
+| 참고본 | `IllegalAdDetector-windows-render.zip` 66,763,937 bytes |
+| 단위 테스트 | 280 passed (static·render) |
+| CLI 스모크(제출본) | PASS, 검사 59개 FAIL 0. fixtures 크롤(result.json·BOM·meta·리포트), `--demo` 9.6초, `--render` 폴백 안내, 5초 강제 종료 후 exe 폴더 result.json 유효(findings 5건, meta 5키) |
+| 브라우저 단계 | 러너 Edge 로 동작. 제출본 데모 "1쪽 렌더, 0쪽 실패, 추가 0건, 3.6s" (참고본 2.8s). 직전 run 39907685766 에서는 1쪽이 15초 상한에 걸려 정적 결과로 계속한 적이 있음 |
 | 실행 캡처 | `build/capture_gui.ps1` 3장 (artifact `captures-static`) |
 | GUI 스모크(제출본) | PASS. mainloop 진입 후 5초 뒤 자동 종료, exit 0 |
 
