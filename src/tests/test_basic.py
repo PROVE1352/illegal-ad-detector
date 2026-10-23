@@ -648,3 +648,39 @@ def test_idn_homograph_is_homoglyph(html, loc):
 def test_idn_homograph_negatives(html):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
     assert not any("HOMOGLYPH" in f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+# ---------- B5: 텍스트 없는 이미지 배너 광고 ----------
+def test_random_and_rotating_domain_rules():
+    from iad.links import random_label_rule
+    assert random_label_rule("k3j9x0qpa7zmv2lsd8ygh4bnt1w")[0] == "link.random_domain"
+    assert random_label_rule("qzxkvbnmptrw")[0] == "link.random_domain"
+    assert random_label_rule("iabn101")[0] == "link.rotating_domain" and random_label_rule("nicelink22")[0] == "link.rotating_domain"
+    for ok in ("happycity-partner", "visitkorea", "naver", "samsung", "kookmin", "seoulculture", "koreaexim"):
+        assert random_label_rule(ok) is None, ok
+
+
+@pytest.mark.parametrize("html", [
+    '<a href="https://k3j9x0qpa7zmv2lsd8ygh4bnt1w.invalid/x"><img alt="배너광고" src="b.png"></a>',
+    '<a href="https://iabn101.invalid/"><img alt="" src="b.png"></a>',
+    '<a href="https://t.me/free_toto"><img alt="이벤트" src="b.png"></a>',
+    '<a href="https://some-partner.invalid/" style="background-image:url(b.png)" title="바카라 이벤트 광고"></a>',
+    '<a href="https://nicelink22.invalid/"><img alt="바로가기" src="b.png"></a>',
+])
+def test_image_banner_ad_detected(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert any("IMAGE_BANNER_AD" in f.extra_names for f in fs), [(f.location, f.extra_names, f.score) for f in fs]
+    assert not any(f.official for f in fs)   # result.json 4종에는 안 넣는다
+
+
+@pytest.mark.parametrize("html", [
+    '<a href="https://www.gov.kr"><img alt="정부24 배너" src="b.png"></a>',
+    '<a href="https://www.mois.go.kr"><img alt="행정안전부 광고" src="b.png"></a>',
+    '<a href="/event/2026"><img alt="가을 축제 이벤트 배너" src="b.png"></a>',
+    '<a href="https://www.happycity-partner.com/"><img alt="행복시 문화재단 홈페이지" src="b.png"></a>',
+    '<a href="https://www.visitkorea.or.kr/"><img alt="한국관광공사 배너" src="b.png"></a>',
+    '<a href="https://www.samsungfoundation.org/"><img alt="재단 홈페이지" src="b.png"></a>',
+])
+def test_image_banner_normal_not_reported(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert not fs, [(f.location, f.extra_names, f.score) for f in fs]

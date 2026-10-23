@@ -378,6 +378,27 @@ class Site:
         self.label("post/post_r4.html", u3, "JAMO", "도박")
         self.label("post/post_r4.html", u4, "HOMOGLYPH", "도박")
 
+        # 레드팀 R3 B5: 텍스트 없는 이미지 배너 광고(무작위 25자 도메인·숫자 접미 회전 도메인·텔레그램, alt=배너광고) + 정상 롤링 배너
+        rnd = self.rng
+        bn = [self.nid() for _ in range(6)]
+        rand_label = lambda n: "".join(rnd.choice("abcdefghijklmnopqrstuvwxyz0123456789") for _ in range(n))  # noqa: E731
+        banners = (
+            f'<a id="{bn[0]}" href="https://{rand_label(27)}.invalid/land?x=1"><img alt="배너광고" src="data:,"></a>'
+            f'<a id="{bn[1]}" href="https://{rand_label(26)}.invalid/"><img alt="배너광고" src="data:,"></a>'
+            f'<a id="{bn[2]}" href="https://{"iabn101" if not v else "nicelink22"}.invalid/"><img alt="" src="data:,"></a>'
+            f'<a id="{bn[3]}" href="https://t.me/{"free_toto" if not v else "vip_slot"}"><img alt="이벤트" src="data:,"></a>'
+            f'<a id="{bn[4]}" href="https://{"qzxkvbnm-ptrw" if not v else "wrtplkjhgf-zxc"}.invalid/"><img alt="바로가기" src="data:,"></a>'
+            f'<a id="{bn[5]}" href="https://{"best-webtoon" if not v else "new-toon"}.invalid/" style="background-image:url(b.png)" title="무료 웹툰 미리보기 광고"></a>'
+        )
+        normal = ('<div class="rolling-banner"><a href="https://www.gov.kr"><img alt="정부24 배너" src="data:,"></a>'
+                  '<a href="https://www.mois.go.kr"><img alt="행정안전부" src="data:,"></a>'
+                  '<a href="https://www.korea.kr"><img alt="정책브리핑 배너" src="data:,"></a>'
+                  '<a href="https://www.happycity-partner.com/"><img alt="행복시 문화재단 홈페이지" src="data:,"></a>'
+                  '<a href="about.html"><img alt="기관소개 배너" src="data:,"></a></div>')
+        add("post/post_banner.html", "주간 소식지 10월호", f'<p>10월 주간 소식지입니다.</p>{normal}<div class="ad-slot">{banners}</div>', [])
+        for eid in bn:
+            self.label("post/post_banner.html", eid, "ETC", "기타", extra="IMAGE_BANNER_AD")
+
         # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
         k1 = self.nid()
         normal_body = "<p>시민 제안 공모를 안내합니다. 접수: 10/20~11/5</p>"

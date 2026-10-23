@@ -70,7 +70,9 @@ uv run pytest -q
   (요강 예시 f_001: `span.visually-hidden` 에 JAMO). 그 요소 아래 자식에는 난독화 finding 을 따로 만들지 않는다.
 - `result_extra.json` 은 technique `"ETC"` 고정, `extra_finding` 에 우리가 정한 유형 이름(HTML_COMMENT, NOSCRIPT,
   HIDDEN_IFRAME, HIDDEN_VISIBILITY_HIDDEN, SCRIPT_INJECTION, META_REFRESH, SUSPICIOUS_TLD, SHORTENER, MESSENGER,
-  ANCHOR_MISMATCH, MASS_EXTERNAL_LINKS, OBFUSCATION_INSERT, DYNAMIC_INJECTION, SCRIPT_DECODED, HIDDEN_EXTERNAL_LINK …)+분류+위험도+점수를 적는다.
+  ANCHOR_MISMATCH, MASS_EXTERNAL_LINKS, OBFUSCATION_INSERT, DYNAMIC_INJECTION, SCRIPT_DECODED, HIDDEN_EXTERNAL_LINK,
+  IMAGE_BANNER_AD=텍스트 없는 이미지 배너 링크로 대상이 무작위 생성(25자+)·고엔트로피·숫자 접미 회전 도메인·의심 TLD·메신저이거나
+  alt/title 에 배너·광고·이벤트·불법 키워드가 있는 것(동일 사이트·go.kr/or.kr 등 신뢰 도메인 제외, result.json 에는 안 넣음) …)+분류+위험도+점수를 적는다.
   예시에 없던 `is_violation` 도 필수 필드 표를 따라 넣는다. (url, location) 당 1건으로 합친다.
 - **location 규칙**: 태그.클래스 를 상위부터 ` > ` 로 연결, 클래스가 없으면 `tr:nth-of-type(7)` 처럼 순서 지정
   (같은 클래스 형제가 여럿이면 클래스에도 nth-of-type 을 붙여 유일하게 만든다). html/body 는 생략하되 선택자가
@@ -111,7 +113,8 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
   레드팀 R1 약점 페이지 1개(font-size 0%·font 단축, 초성 축약, 평문 없는 키릴·그리스·leet + 정상 러시아어·자모 교육·초성 퀴즈·전화번호 하드 네거티브).
   R2 페이지 1개(키릴 전체·전각·leet·체로키로 위장한 영문 도박어 + 정상 러시아어·전각 약어·covid19 하드 네거티브).
   R2 OFFSCREEN 일반형 페이지 1개(뷰포트 밖 양수·부모 overflow 밖·clip-path/clip·1×1·scale(0)·max-height 0·hidden 속성 + 접힌 아코디언·sr-only·숨긴 메뉴 하드 네거티브).
-  4종 라벨 49개(중첩 2요소 포함), ETC 라벨 16개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
+  R3 버그 재현 페이지(B1 같은 요소 color=background 외부 CSS, B2 숨김 클래스+자모, B3 NFD, B4 IDN 호모그래프)와 이미지 배너 광고 페이지(무작위·회전 도메인·텔레그램 6개 + 정상 롤링 배너 5개).
+  4종 라벨 54개(중첩 2요소 포함), ETC 라벨 22개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
 - 채점은 요강 방식 그대로: result.json 의 (url, location, technique) 단위로, location 을 DOM 에서 해석해 라벨 요소와 같은지 비교.
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.

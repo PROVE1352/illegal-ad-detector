@@ -474,11 +474,46 @@ class PageAnalyzer:
             return False
         return admin_context_score(text, ADMIN_WINDOW) <= ADMIN_EXCLUDE
 
+    BANNER_ALT_HINTS = ("배너", "광고", "이벤트", "banner", "ad", "ads", "event", "프로모션", "promo", "sponsor")
+
+    def _image_banner(self, f: Finding, a: Tag, text: str) -> str:
+        """텍스트 없이 이미지(또는 background-image)만 있는 링크 = 배너. 의심 도메인이거나 alt/title 에 배너·광고·이벤트·불법 키워드가
+        있으면 IMAGE_BANNER_AD 근거를 붙인다(ETC 전용). 공공기관·신뢰 도메인·동일 사이트 링크는 제외. 반환: alt/title 텍스트."""
+        imgs = a.find_all("img")
+        st = a.get("style") or ""
+        if text.strip() or not (imgs or "background-image" in st or "background:" in st and "url(" in st):
+            return ""
+        href = urljoin(self.page.url, str(a.get("href", "")))
+        host = host_of(href)
+        if not host or is_same_site(href, self.base_host) or is_trusted(host):
+            return ""
+        alt = " ".join(str(i.get("alt", "")) + " " + str(i.get("title", "")) for i in imgs) + " " + str(a.get("title", ""))
+        alt_l = alt.lower()
+        hint = next((h for h in self.BANNER_ALT_HINTS if h in alt_l), None)
+        kw = match_keywords_levels(alt)
+        suspicious = f.has_group("link")
+        if suspicious or hint or kw:
+            why = []
+            if suspicious:
+                why.append("의심 도메인")
+            if hint:
+                why.append(f"alt/title '{hint}'")
+            if kw:
+                why.append("alt/title 불법 키워드")
+            f.add("banner.image_only", f"텍스트 없는 이미지 배너 링크 → {host} (" + ", ".join(why) + ")", 2.5, "link")
+            if "image_banner" not in f.techniques:
+                f.techniques.append("image_banner")
+            f.extra_names.append("IMAGE_BANNER_AD")
+            if not f.evidence_text.strip():
+                f.evidence_text = f"[이미지 배너] alt='{alt.strip()[:120]}' href={href[:200]}"
+        return alt
+
     def _visible_anchor(self, a: Tag) -> None:
         text = a.get_text(" ")
         f = self._new(a)
         self._add_links(f, a, "")
-        cats, max_w = self._add_keywords(f, text + " " + str(a.get("title", "")))
+        alt = self._image_banner(f, a, text)
+        cats, max_w = self._add_keywords(f, text + " " + str(a.get("title", "")) + " " + alt)
         self._idn_homograph(f, a, text)
         if f.has_group("link") and f.has_group("keyword"):
             f.add("combo.keyword_link", "의심 링크 + 키워드 동시 출현", 1.5, "link")

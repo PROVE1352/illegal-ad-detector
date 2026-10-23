@@ -79,7 +79,33 @@ def analyze_link(href: str, anchor_text: str, base_host: str) -> list[tuple[str,
             out.append(("link.anchor_mismatch", f"앵커 텍스트 도메인({text_host}) ≠ 실제 링크({host})", w))
     if len(host) > 40:
         out.append(("link.long_host", f"비정상적으로 긴 호스트 ({host[:40]}…)", 1))
+    rnd = random_label_rule(label)
+    if rnd:
+        out.append(rnd)
     return out
+
+
+_VOWELS = set("aeiouy")
+
+
+def random_label_rule(label: str) -> tuple[str, str, float] | None:
+    """무작위 생성·회전 도메인 레이블 휴리스틱(이미지 배너 광고의 링크 대상 패턴).
+    - 25자 이상 소문자+숫자 무작위 / 12자 이상인데 모음 비율이 낮거나 자음 5연속·숫자 혼입(고엔트로피)
+    - 영문 + 끝 숫자 2~4자리(iabn101, nicelink22 꼴 회전 도메인)"""
+    l = (label or "").lower()
+    if not l or not re.fullmatch(r"[a-z0-9-]+", l):
+        return None
+    letters = re.sub(r"[^a-z]", "", l)
+    if len(l) >= 25:
+        return ("link.random_domain", f"무작위 생성 도메인(길이 {len(l)}) ({l[:30]}…)", 3.0)
+    if len(l) >= 12:
+        vowel_ratio = sum(c in _VOWELS for c in letters) / max(len(letters), 1)
+        has_digit = bool(re.search(r"\d", l))
+        if vowel_ratio < 0.25 or re.search(r"[bcdfghjklmnpqrstvwxz]{5,}", letters) or (has_digit and len(letters) >= 8 and vowel_ratio < 0.35):
+            return ("link.random_domain", f"고엔트로피 도메인 레이블 ({l})", 2.5)
+    if re.fullmatch(r"[a-z]{3,}\d{2,4}", l) or re.fullmatch(r"[a-z]{2,}\d{1,3}[a-z]{1,4}\d{1,3}", l):
+        return ("link.rotating_domain", f"숫자 접미 회전 도메인 ({l})", 2.0)
+    return None
 
 
 def find_urls_in_text(text: str) -> list[str]:
