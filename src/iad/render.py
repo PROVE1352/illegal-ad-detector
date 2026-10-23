@@ -78,3 +78,12 @@ def _ext_links(html: str, url: str, base_host: str) -> set[str]:
         if h and not is_same_site(href, base_host) and not is_trusted(h):
             out.add(href)
     return out
+
+
+def render_available() -> bool:
+    """playwright 가 import 되는 배포본인지(정적 빌드면 False)."""
+    try:
+        import importlib.util
+        return importlib.util.find_spec("playwright") is not None
+    except Exception:
+        return False

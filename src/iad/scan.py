@@ -1,6 +1,7 @@
 """탐지 파이프라인: 크롤 → 분석 → (선택) 렌더 비교 → result.json/result_extra.json + 리포트."""
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -81,7 +82,8 @@ def scan(entry_url: str, config: CrawlConfig | None = None, out_dir: Path | None
             res.findings.extend(extra)
             res.render_used = True
         except Exception as e:
-            log(f"렌더 비교 생략(playwright/Edge 사용 불가): {e.__class__.__name__}")
+            log("렌더 비교를 사용할 수 없어 정적 분석 결과로 계속합니다.")
+            logging.getLogger("iad").debug("render_compare 실패: %s: %s", e.__class__.__name__, e)
     res.finished = datetime.now(KST)
     log(f"탐지 완료: 페이지 {len(res.pages)}개, 탐지 {len(res.findings)}건, {time.monotonic() - t0:.1f}s")
     res.result_json, res.result_extra_json = write_results(res.findings, entry_url, res.started, res.finished,

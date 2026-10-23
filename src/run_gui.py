@@ -61,7 +61,17 @@ class App(tk.Tk):
         ttk.Checkbutton(opts, text="robots.txt 존중", variable=self.robots).pack(side="left", padx=4)
         ttk.Checkbutton(opts, text="외부 iframe 수집", variable=self.ext_iframe).pack(side="left", padx=4)
         ttk.Checkbutton(opts, text="클로킹 점검(봇 UA 재요청)", variable=self.cloak).pack(side="left", padx=4)
-        ttk.Checkbutton(opts, text="Edge 렌더 비교(선택, 느림)", variable=self.render).pack(side="left", padx=4)
+        self.render_cb = ttk.Checkbutton(opts, text="Edge 렌더 비교(선택, 느림)", variable=self.render)
+        self.render_cb.pack(side="left", padx=4)
+        try:
+            from iad.render import render_available
+            static_only = not render_available()
+        except Exception:
+            static_only = True
+        if static_only:   # 제출본은 playwright 없는 정적 빌드
+            self.render.set(False)
+            self.render_cb.configure(state="disabled")
+            ttk.Label(opts, text="(이 배포본은 정적 분석 전용 — 렌더 비교 미포함)", foreground="#667").pack(side="left", padx=4)
         btns = ttk.Frame(top)
         btns.grid(row=4, column=0, columnspan=6, sticky="we", pady=(8, 0))
         self.start_btn = ttk.Button(btns, text="탐지 시작", command=self.start)
