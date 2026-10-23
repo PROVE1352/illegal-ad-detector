@@ -453,7 +453,11 @@ class PageAnalyzer:
 
     # ---------- HOMOGLYPH / JAMO ----------
     def _obf_codes(self, text: str, leaf: bool = True) -> tuple[set[str], list[tuple[str, float, str]], dict[str, float]]:
-        """텍스트에서 요강 난독화 코드 집합을 구한다."""
+        """텍스트에서 요강 난독화 코드 집합을 구한다.
+
+        치환 매칭(키워드가 치환/합성 후에만 맞음)은 그대로 인정. 동반 신호(평문 키워드 + 전각/스크립트 혼용/분리 자모)로만 얻은
+        코드는 행정 문맥(예방·단속·신고 안내)에서는 인정하지 않는다(２０２６년 단속 안내 같은 공지 오탐 방지).
+        """
         codes: set[str] = set()
         allhits: list[tuple[str, float, str]] = []
         cats: dict[str, float] = {}
@@ -466,12 +470,16 @@ class PageAnalyzer:
                 if lv in ("JAMO", "HOMOGLYPH"):
                     codes.add(lv)
         if leaf and allhits and max(w for _, w, _ in allhits) >= 2.0:
-            # 평문 키워드 + 문자 단서(전각·키릴 / 합성 가능 자모) → 해당 기법으로 본다(요강 예시 ｍｅｇａ－ＢＥＴ 첫충)
-            # 블록 자식이 없는 요소(leaf)에서만: 컨테이너 수준에서 날짜 전각숫자와 키워드가 우연히 합쳐지는 오탐 방지
+            # 평문 키워드 + 문자 단서(전각 영문·스크립트 혼용 / 합성 가능 자모) → 해당 기법으로 본다(요강 예시 ｍｅｇａ－ＢＥＴ 첫충)
+            # 블록 자식이 없는 요소(leaf)에서만: 컨테이너 수준에서 키워드가 우연히 합쳐지는 오탐 방지
+            companion: set[str] = set()
             if has_homoglyph_chars(text):
-                codes.add("HOMOGLYPH")
+                companion.add("HOMOGLYPH")
             if has_composable_jamo(text):
-                codes.add("JAMO")
+                companion.add("JAMO")
+            companion -= codes
+            if companion and admin_context_score(text, ADMIN_WINDOW) > ADMIN_EXCLUDE:
+                codes |= companion
         return codes, allhits, cats
 
     def _obf_codes_nocho(self, text: str, leaf: bool) -> set[str]:

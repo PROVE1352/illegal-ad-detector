@@ -1,17 +1,17 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 12:20:48",
+  "timestamp": "2026-10-23 12:26:18",
   "depth": 3,
   "max_pages": 300,
-  "port": 53001
+  "port": 8765
  },
  "results": [
   {
    "set": "dev",
-   "entry_url": "http://127.0.0.1:53001/dev/index.html",
+   "entry_url": "http://127.0.0.1:8765/dev/index.html",
    "pages_crawled": 28,
-   "elapsed_sec": 0.2,
-   "tool_elapsed_sec": 0.193224,
+   "elapsed_sec": 0.22,
+   "tool_elapsed_sec": 0.213139,
    "official": {
     "gold": 38,
     "reported_units": 38,
@@ -55,14 +55,14 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_lw6dn1za"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_cqz46ylc"
   },
   {
    "set": "holdout",
-   "entry_url": "http://127.0.0.1:53001/holdout/index.html",
+   "entry_url": "http://127.0.0.1:8765/holdout/index.html",
    "pages_crawled": 28,
    "elapsed_sec": 0.14,
-   "tool_elapsed_sec": 0.130718,
+   "tool_elapsed_sec": 0.13517,
    "official": {
     "gold": 38,
     "reported_units": 38,
@@ -106,7 +106,7 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_ak19jfdz"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_3mcsm8mm"
   }
  ]
 }
