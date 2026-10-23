@@ -1,0 +1,4 @@
+# 참고본(렌더 포함) 빌드 도구: 제출본 도구 + Playwright 드라이버.
+# 브라우저는 내려받지 않는다(playwright install 실행 안 함). 런타임에 channel="msedge" 사용.
+-r requirements-build.txt
+playwright==1.64.1

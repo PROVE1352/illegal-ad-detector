@@ -47,7 +47,11 @@ datas += collect_data_files("certifi")
 
 # Playwright(선택): 브라우저는 받지 않고 드라이버(node + package)만 포함한다.
 # 런타임에 channel="msedge" 로 시스템 Edge 를 쓴다.
+# IAD_STATIC_ONLY=1 이면 playwright 가 설치돼 있어도 넣지 않는다(제출본).
+STATIC_ONLY = os.environ.get("IAD_STATIC_ONLY") == "1"
 try:
+    if STATIC_ONLY:
+        raise ImportError("IAD_STATIC_ONLY=1")
     import playwright  # noqa: F401
 
     pw_datas, pw_binaries, pw_hidden = collect_all("playwright")
@@ -61,6 +65,8 @@ hiddenimports += ["tkinter", "tkinter.ttk", "tkinter.filedialog", "tkinter.messa
 
 runtime_hooks = [str(BUILD_DIR / "hooks" / "rth_iad.py")]
 excludes = ["matplotlib", "numpy.tests", "pytest", "IPython"]
+if STATIC_ONLY:
+    excludes += ["playwright", "greenlet", "pyee"]
 
 icon_path = BUILD_DIR / "icon.ico"
 icon = str(icon_path) if icon_path.exists() else None

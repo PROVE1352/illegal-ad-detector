@@ -3,18 +3,57 @@
 #  2) iad-cli.exe 로 로컬 사이트를 크롤링한다(정적 모드).
 #  3) 확인: 종료 코드 0, 구동 파일 폴더에 result.json 생성, UTF-8 BOM 없음, JSON 파싱 가능,
 #     meta/findings 키 존재, result_extra.json(있으면) 동일 검사, HTML 리포트 생성.
+#  4) --demo --no-open: 내장 테스트베드 스캔 → <exe 폴더>/demo 에 result.json·report.html·demo_labels.json.
+#  5) -ExpectRenderFallback(정적 전용 빌드): --render 를 줘도 안내 로그를 남기고 정적 분석으로 끝나는지.
 param(
     [Parameter(Mandatory = $true)][string]$AppDir,
     [Parameter(Mandatory = $true)][string]$FixturesDir,
     [Parameter(Mandatory = $true)][string]$OutDir,
     [int]$Port = 8765,
-    [int]$TimeoutSec = 600
+    [int]$TimeoutSec = 600,
+    [switch]$ExpectRenderFallback
 )
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)   # exe 의 UTF-8 출력을 그대로 읽는다
 $failures = New-Object System.Collections.Generic.List[string]
 function Check([bool]$ok, [string]$what) {
     if ($ok) { Write-Host "  [OK]   $what" } else { Write-Host "  [FAIL] $what"; $failures.Add($what) }
+}
+
+function Invoke-Cli([string[]]$CliArgs, [string]$Tag) {
+    # stdout/stderr 를 파일로 받아 마지막 줄을 보여 주고 종료 코드를 돌려준다.
+    $logOut = Join-Path $OutDir "cli_${Tag}_stdout.log"
+    $logErr = Join-Path $OutDir "cli_${Tag}_stderr.log"
+    Write-Host "== iad-cli $($CliArgs -join ' ')"
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $p = Start-Process -FilePath $cli -ArgumentList ($CliArgs | ForEach-Object { "`"$_`"" }) -WorkingDirectory $OutDir `
+        -RedirectStandardOutput $logOut -RedirectStandardError $logErr -PassThru -NoNewWindow
+    $null = $p.Handle
+    if (-not $p.WaitForExit($TimeoutSec * 1000)) { Stop-Process -Id $p.Id -Force; throw "CLI($Tag) 시간 초과 ${TimeoutSec}s" }
+    $sw.Stop()
+    # 함수 반환값에 섞이지 않게 Out-Host 로 보낸다
+    Get-Content -LiteralPath $logOut -Encoding utf8 | Select-Object -Last 25 | Out-Host
+    Write-Host "---- stderr ----"; Get-Content -LiteralPath $logErr -Encoding utf8 | Select-Object -Last 25 | Out-Host
+    Write-Host ("CLI($Tag) 소요 {0:N1}s" -f $sw.Elapsed.TotalSeconds)
+    return @{ Code = $p.ExitCode; Out = (Get-Content -LiteralPath $logOut -Raw -Encoding utf8) + (Get-Content -LiteralPath $logErr -Raw -Encoding utf8) }
+}
+function Test-ResultJson([string]$path, [string]$label, [bool]$needFindings) {
+    if (-not (Test-Path -LiteralPath $path)) { Check $false "$label 생성 ($path)"; return }
+    Check $true "$label 생성 ($path)"
+    $bytes = [IO.File]::ReadAllBytes($path)
+    $bom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+    Check (-not $bom) "$label UTF-8 BOM 없음"
+    try {
+        $json = [Text.UTF8Encoding]::new($false, $true).GetString($bytes) | ConvertFrom-Json
+        Check ($null -ne $json.meta) "$label meta 키"
+        Check ($json.PSObject.Properties.Name -contains "findings") "$label findings 키"
+        foreach ($k in @("topic", "entry_url", "started_at", "finished_at", "elapsed_sec")) {
+            Check ($json.meta.PSObject.Properties.Name -contains $k) "$label meta.$k"
+        }
+        $n = @($json.findings).Count
+        Write-Host "  $label findings = $n 건"
+        if ($needFindings) { Check ($n -gt 0) "$label 검출 1건 이상" }
+    } catch { Check $false "$label JSON 파싱 ($($_.Exception.Message))" }
 }
 
 $cli = Join-Path $AppDir "iad-cli.exe"
@@ -104,6 +143,27 @@ try {
     if ($html.Count -gt 0) {
         $content = [IO.File]::ReadAllText($html[0].FullName, [Text.Encoding]::UTF8)
         Check ($content.Length -gt 500) "HTML 리포트 내용 있음 ($($content.Length) chars)"
+    }
+
+    # 4) --demo (브라우저 자동 열기 끔). 결과는 기본 위치 <exe 폴더>/demo 에 생긴다.
+    $demoDir = Join-Path $AppDir "demo"
+    if (Test-Path -LiteralPath $demoDir) { Remove-Item -LiteralPath $demoDir -Recurse -Force }
+    $r = Invoke-Cli @("--demo", "--no-open") "demo"
+    Check ($r.Code -eq 0) "--demo 종료 코드 0 (실제 $($r.Code))"
+    Test-ResultJson (Join-Path $demoDir "result.json") "demo/result.json" $true
+    Check (Test-Path -LiteralPath (Join-Path $demoDir "demo_labels.json")) "demo/demo_labels.json 생성"
+    $demoHtml = @(Get-ChildItem -LiteralPath $demoDir -Filter *.html -ErrorAction SilentlyContinue)
+    Check ($demoHtml.Count -gt 0) "demo HTML 리포트 생성 ($($demoHtml.FullName -join '; '))"
+    if (Test-Path -LiteralPath $demoDir) { Copy-Item -Recurse -Force -LiteralPath $demoDir -Destination (Join-Path $OutDir "demo") }
+
+    # 5) 정적 전용 빌드에서 --render: 안내 로그 후 정적 분석으로 정상 종료해야 한다.
+    if ($ExpectRenderFallback) {
+        $fbDir = Join-Path $OutDir "렌더 폴백"
+        $r = Invoke-Cli @("--url", $entry, "--render", "--result-dir", $fbDir, "--delay", "0", "--depth", "3") "render_fallback"
+        Check ($r.Code -eq 0) "--render(정적 전용) 종료 코드 0 (실제 $($r.Code))"
+        $fbLine = @($r.Out -split "`r?`n" | Where-Object { $_ -match "렌더 비교 생략" })
+        Check ($fbLine.Count -gt 0) "--render 선택 시 안내 로그 ('$($fbLine -join ' / ')')"
+        Test-ResultJson (Join-Path $fbDir "result.json") "렌더 폴백 result.json" $true
     }
 }
 finally {

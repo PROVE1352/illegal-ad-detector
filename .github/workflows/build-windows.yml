@@ -25,8 +25,26 @@ env:
 
 jobs:
   build:
+    # static = 제출본(정적 모드 전용, playwright 미포함) / render = 참고본(Edge 렌더 비교용 Playwright 드라이버 포함)
+    name: build (${{ matrix.variant }})
     runs-on: windows-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: static
+            reqs: build/requirements-build.txt
+            static_only: "1"
+            zip: IllegalAdDetector-windows.zip
+            artifact: IllegalAdDetector-windows
+          - variant: render
+            reqs: build/requirements-build-render.txt
+            static_only: "0"
+            zip: IllegalAdDetector-windows-render.zip
+            artifact: IllegalAdDetector-windows-render
+    env:
+      IAD_STATIC_ONLY: ${{ matrix.static_only }}
     steps:
       - uses: actions/checkout@v5
 
@@ -47,14 +65,14 @@ jobs:
           cache: pip
           cache-dependency-path: |
             src/requirements.txt
-            build/requirements-build.txt
+            build/requirements-build*.txt
 
       - name: 의존성 설치
         if: steps.check.outputs.ready == 'true'
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r src/requirements.txt
-          python -m pip install -r build/requirements-build.txt
+          python -m pip install -r ${{ matrix.reqs }}
           python -m pip list
 
       - name: 단위 테스트(있으면)
@@ -68,6 +86,10 @@ jobs:
         run: |
           pyinstaller build/iad.spec --noconfirm --clean --distpath build/dist --workpath build/work
           Get-ChildItem build/dist/IllegalAdDetector | Format-Table Name, Length
+          $hasPw = Test-Path build/dist/IllegalAdDetector/_internal/playwright
+          Write-Host "variant=${{ matrix.variant }} playwright 포함=$hasPw"
+          if ($env:IAD_STATIC_ONLY -eq "1" -and $hasPw) { throw "정적 전용 빌드에 playwright 가 들어감" }
+          if ($env:IAD_STATIC_ONLY -ne "1" -and -not $hasPw) { throw "렌더 포함 빌드에 playwright 드라이버가 없음" }
 
       - name: 스모크 테스트 (한글 경로에 복사해서 실행)
         if: steps.check.outputs.ready == 'true'
@@ -77,7 +99,7 @@ jobs:
           Copy-Item -Recurse -Force build/dist/IllegalAdDetector/* $kdir
           $out = Join-Path $env:RUNNER_TEMP "스모크 결과"
           try {
-            ./build/smoke_cli.ps1 -AppDir $kdir -FixturesDir src/fixtures -OutDir $out
+            ./build/smoke_cli.ps1 -AppDir $kdir -FixturesDir src/fixtures -OutDir $out -ExpectRenderFallback:($env:IAD_STATIC_ONLY -eq "1")
             if ($LASTEXITCODE -ne 0) { throw "CLI 스모크 실패" }
             ./build/smoke_gui.ps1 -Exe (Join-Path $kdir "IllegalAdDetector.exe") -WorkDir (Join-Path $out "gui")
             if ($LASTEXITCODE -ne 0) { throw "GUI 스모크 실패" }
@@ -94,21 +116,21 @@ jobs:
       - name: 산출물 zip
         if: steps.check.outputs.ready == 'true'
         run: |
-          Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/IllegalAdDetector-windows.zip -Force
-          Get-Item build/IllegalAdDetector-windows.zip | Format-Table Name, Length
+          Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/${{ matrix.zip }} -Force
+          Get-Item build/${{ matrix.zip }} | Format-Table Name, Length
 
       - uses: actions/upload-artifact@v6
         if: steps.check.outputs.ready == 'true'
         with:
-          name: IllegalAdDetector-windows
-          path: build/IllegalAdDetector-windows.zip
+          name: ${{ matrix.artifact }}
+          path: build/${{ matrix.zip }}
           if-no-files-found: error
           compression-level: 0
 
       - uses: actions/upload-artifact@v6
         if: always() && steps.check.outputs.ready == 'true'
         with:
-          name: smoke-output
+          name: smoke-output-${{ matrix.variant }}
           path: build/smoke_out/
           if-no-files-found: ignore
 
