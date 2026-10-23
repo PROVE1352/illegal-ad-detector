@@ -140,6 +140,7 @@ def evaluate_set(name: str, labels: list[dict], decoys: list[str], root: Path, p
     def key(doc: str, eid: str | None, tech: str) -> tuple:
         return (doc, eid, tech)
 
+    labels = [l for l in labels if not l.get("platform") or l["platform"] == sys.platform]   # OS 전용 라벨(Windows OCR)은 그 OS 에서만
     gold_off = {key(f"{name}/{l['doc']}", l["element_id"], l["technique"]): l for l in labels if l["technique"] in OFFICIAL}
     gold_etc = {key(f"{name}/{l['doc']}", l["element_id"], "ETC"): l for l in labels if l["technique"] == "ETC"}
 
