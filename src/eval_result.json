@@ -1,17 +1,17 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 12:35:18",
+  "timestamp": "2026-10-23 12:48:00",
   "depth": 3,
   "max_pages": 300,
-  "port": 59840
+  "port": 8765
  },
  "results": [
   {
    "set": "dev",
-   "entry_url": "http://127.0.0.1:59840/dev/index.html",
+   "entry_url": "http://127.0.0.1:8765/dev/index.html",
    "pages_crawled": 30,
-   "elapsed_sec": 0.22,
-   "tool_elapsed_sec": 0.21434,
+   "elapsed_sec": 0.23,
+   "tool_elapsed_sec": 0.226581,
    "official": {
     "gold": 49,
     "reported_units": 49,
@@ -48,21 +48,34 @@
    },
    "extra": {
     "gold": 16,
-    "reported": 16,
+    "reported": 17,
     "hit": 16,
     "recall": 1.0,
-    "false_positives": [],
+    "false_positives": [
+     {
+      "id": "f_008",
+      "url": "http://127.0.0.1:8765/dev/post/post_library.html",
+      "is_violation": true,
+      "location": "iframe[src=\"http://localhost:8765/dev/ext/px.html\"] >>> a",
+      "evidence_text": "go  [근거: 의심 TLD .top (777.top); 숫자가 많은 도메인 (777.top)]",
+      "technique": "ETC",
+      "extra_finding": "numeric_domain+suspicious_tld / 분류=의심 링크 / 위험도=낮음 / 점수=4.5",
+      "reason": "라벨 없음",
+      "doc": "dev/ext/px.html",
+      "element_id": null
+     }
+    ],
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_oipygtdn"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_jb13rn6x"
   },
   {
    "set": "holdout",
-   "entry_url": "http://127.0.0.1:59840/holdout/index.html",
+   "entry_url": "http://127.0.0.1:8765/holdout/index.html",
    "pages_crawled": 30,
    "elapsed_sec": 0.16,
-   "tool_elapsed_sec": 0.151221,
+   "tool_elapsed_sec": 0.156612,
    "official": {
     "gold": 49,
     "reported_units": 49,
@@ -99,14 +112,27 @@
    },
    "extra": {
     "gold": 16,
-    "reported": 16,
+    "reported": 17,
     "hit": 16,
     "recall": 1.0,
-    "false_positives": [],
+    "false_positives": [
+     {
+      "id": "f_008",
+      "url": "http://127.0.0.1:8765/holdout/post/post_library.html",
+      "is_violation": true,
+      "location": "iframe[src=\"http://localhost:8765/holdout/ext/px.html\"] >>> a",
+      "evidence_text": "go  [근거: 의심 TLD .xyz (777.xyz); 숫자가 많은 도메인 (777.xyz)]",
+      "technique": "ETC",
+      "extra_finding": "numeric_domain+suspicious_tld / 분류=의심 링크 / 위험도=낮음 / 점수=4.5",
+      "reason": "라벨 없음",
+      "doc": "holdout/ext/px.html",
+      "element_id": null
+     }
+    ],
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_hccyxaj6"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_g27trguw"
   }
  ]
 }

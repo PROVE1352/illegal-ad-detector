@@ -547,3 +547,35 @@ def test_offscreen_general_forms(html, code):
 def test_offscreen_general_hard_negatives(html):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
     assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+
+# ---------- B1: 같은 요소의 color = 자기 background (클래스 규칙·외부 CSS·단축 속성) ----------
+@pytest.mark.parametrize("css,cls", [
+    (".x{color:#ffffff;background:#ffffff}", "x"), (".x{color:#FFF;background-color:#FFF}", "x"), (".x{color:white;background:white}", "x"),
+    (".x{color:#000;background:#000 none repeat scroll 0 0}", "x"), (".x{color:rgb(255,255,255);background:rgb(255, 255, 255) url(a.png)}", "x"),
+    (".x{color:#eee}.x{background:#eee}", "x"), ("p.x{color:#fff !important}.x{background:#fff}", "x"),
+    ("@media screen{.x{color:#ffffff;background:#ffffff}}", "x"), (".x{color:#ffffff;background:#ffffff}", "x y"),
+])
+def test_transparent_same_element_background(css, cls):
+    html = f'<html><head><style>{css}</style></head><body><div style="background:#222"><p class="{cls}">토토사이트 안전놀이터</p></div></body></html>'
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=html), "ex.go.kr")
+    assert any("TRANSPARENT" in f.official and f.location.startswith("div > p.x") for f in fs), [(f.location, f.official) for f in fs]
+
+
+def test_transparent_external_css_end_to_end(tmp_path):
+    """외부 CSS(localhost 절대 경로 href 포함)로 color=background 를 준 요소가 TRANSPARENT 로 나와야 한다."""
+    from iad.testbed import pick_port, serve
+    from iad.crawler import CrawlConfig
+    from iad.scan import scan
+    port = pick_port(0)
+    (tmp_path / "s.css").write_text(".x{color:#ffffff;background:#ffffff}\n")
+    (tmp_path / "index.html").write_text(f'<html><head><meta charset="utf-8"><link rel="stylesheet" href="http://localhost:{port}/s.css"></head>'
+                                         f'<body><p class="x">토토사이트 안전놀이터</p></body></html>', encoding="utf-8")
+    srv = serve(tmp_path, port)
+    try:
+        res = scan(f"http://127.0.0.1:{port}/index.html", CrawlConfig(delay=0, allowed_hosts=("127.0.0.1", "localhost"), cloak_pages=0),
+                   out_dir=tmp_path / "out", result_dir=tmp_path / "out", log=lambda m: None, write_report=False)
+    finally:
+        srv.shutdown()
+    assert any("TRANSPARENT" in f.official and f.location == "p.x" for f in res.findings), [(f.location, f.official) for f in res.findings]

@@ -200,7 +200,10 @@ class Crawler:
             if media and "print" in media and "screen" not in media and "all" not in media:
                 continue
             href = urljoin(page.url, str(ln["href"]).strip())
-            if not href.startswith(("http://", "https://")) or not is_same_site(href, self.base_host):
+            if not href.startswith(("http://", "https://")):
+                continue
+            if not is_same_site(href, self.base_host) and not (
+                    self.cfg.allowed_hosts is not None and host_of(href) in self.cfg.allowed_hosts):
                 continue
             css = self._fetch_css(href)
             if not css:
