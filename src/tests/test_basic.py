@@ -928,3 +928,24 @@ scan("http://127.0.0.1:{srv.server_port}/p?i=0", CrawlConfig(delay=0, allowed_ho
         assert set(data) == {"meta", "findings"} and data["meta"]["entry_url"].endswith("/p?i=0")
     assert json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))["findings"], "SIGTERM 전까지의 4종 검출이 기록되어야 함"
     assert not list(tmp_path.glob("result*.tmp*"))
+
+
+# ---------- P0-3: 실사이트 잡음 ----------
+@pytest.mark.parametrize("html", [
+    '<form class="search"><input type="text" name="q" value="ѕо.invalid 토토"><input type="hidden" name="bbsId" value="B1"></form>',   # 폼 컨트롤
+    '<div style="display:none"><ul class="lnb">' + "".join(f'<li><a href="/m{i}">메뉴{i}</a></li>' for i in range(12)) + '<li><a href="https://cloud.redwhistle.org/x">신고</a></li></ul></div>',  # 접힌 메뉴 + 외부 1개
+    '<div><!-- [data-hwpjson]{ "documentPr": {"s1":"ot", "x": "야", "y": "한" } } --></div>',   # 에디터 메타데이터
+    '<div><!-- 불법도박 신고 안내: 도박 광고 발견 시 1336 으로 신고하세요 --></div>',           # 행정 문맥 주석
+    '<script>var menu=\'<a href="/sub/01">\' + encodeURIComponent("%ED%95%9C%EA%B8%80") + \'</a>\'; $("#gnb").html(menu); document.getElementById("x").innerHTML = menu;</script>',  # 정상 jQuery 템플릿
+    '<script>var s = "%3Cdiv%20class%3D%22wrap%22%3E%ED%96%89%EC%A0%95%EC%95%88%EC%A0%84%EB%B6%80%3C%2Fdiv%3E"; document.write(unescape(s));</script>',  # 내부 UI 문자열 인코딩
+])
+def test_realworld_noise_not_reported(html):
+    fs = analyze_page(Page(url="http://www.mois.go.kr/p", html=f"<html><body>{html}</body></html>"), "mois.go.kr")
+    assert not fs, [(f.location, f.official, f.extra_names, f.score) for f in fs]
+
+
+def test_realworld_set_passes():
+    import eval as ev
+    rw = ev.evaluate_realworld()
+    assert rw is not None and rw["pass"], rw
+    assert not rw["official_fp"] and len(rw["extra"]) <= ev.RW_MAX_ETC and rw["cpu_per_page"] <= ev.RW_MAX_CPU_PER_PAGE

@@ -113,7 +113,7 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 스타일 해석 규칙: 인라인 style, 문서 `<style>`, 동일 사이트 외부 CSS(`<link rel=stylesheet>`·`@import` 1단계)를 모두 읽고
 (!important, 명시도, 선언 순서) 순으로 캐스케이드한다. 의사클래스(:hover 등) 선택자와 `@media print` 블록은 적용하지 않는다.
 외부 CSS 는 숨김 판정에 쓰는 속성(display/visibility/opacity/font-size/position/offset/text-indent/clip/color/background/크기, margin·transform 은
-화면 밖 값일 때만)만 추리고, 단순 선택자(tag/.class/#id)는 페이지당 1회 만든 색인으로 해석하므로 5,000규칙 CSS + 300페이지 사이트도
+화면 밖 값일 때만)만 추리고, 선택자는 자체 경량 매처(tag.class#id[attr] 복합 + 후손/자식 결합자, 오른쪽 복합부터 색인으로 후보를 잡고 조상 사슬 확인; 페이지에 없는 클래스·id 를 요구하는 규칙은 즉시 제외, +·~·:not 등 미지원 문법만 soupsieve 로 페이지당 150개 상한)로 해석하므로 5,000규칙 CSS + 300페이지 사이트도
 전체 7초 안팎(페이지당 ~25ms, 클로킹 점검 포함)이다.
 
 ## 하네스 (`eval.py`)
@@ -132,6 +132,14 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 - 채점은 요강 방식 그대로: result.json 의 (url, location, technique) 단위로, location 을 DOM 에서 해석해 라벨 요소와 같은지 비교.
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.
+- **실사이트 정상 세트** `fixtures/realworld/`(행안부 게시판 10쪽 + 외부 CSS 9개, 공개 페이지를 1초 간격으로 1회 수집, manifest.json):
+  오프라인으로 분석해 4종 0건 · ETC ≤9 · 쪽당 CPU ≤0.5s 를 통과 조건으로 EVAL_RESULT.md 에 PASS/FAIL 을 적는다(정상 공공 사이트 잡음 회귀 방지).
+
+실사이트 잡음 억제 규칙(P0-3): 폼 컨트롤(input/select/textarea/button…)은 텍스트 광고가 아니므로 4종 대상에서 제외(ETC 만).
+숨긴 메뉴의 외부 링크는 비신뢰 외부 링크가 3개 이상이거나 링크의 절반 이상일 때만 HIDDEN_EXTERNAL_LINK. HTML 주석은 에디터 메타데이터
+(`[data-hwpjson]{…}` 등 데이터 덩어리)를 건너뛰고, 비신뢰 외부 링크 또는 가중치 ≥2.5 키워드가 있을 때만, 행정 문맥('불법도박 신고 안내')이면 제외.
+스크립트 주입·인코딩 근거는 디코딩/주입 내용에 비신뢰 외부 URL 또는 불법 키워드가 있을 때만 강하게(정상 jQuery 템플릿·분석 스크립트는 1.0/0.5).
+짧은 키워드(영문 ≤8자, 한글 ≤2자)는 JSON/CSS/JS 의 따옴표·괄호·콜론 경계를 넘어 이어 붙은 우연한 일치("s1":"ot"→slot)를 세지 않는다.
 
 ## 빌드 (PyInstaller, Windows)
 - 진입점 `src/run_gui.py` (CLI 는 `python -m iad`). 데이터 파일 없음(키워드 사전은 .py, `--demo` 테스트 사이트도 `iad/testbed.py` 가

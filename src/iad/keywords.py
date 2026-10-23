@@ -5,6 +5,8 @@
 """
 from __future__ import annotations
 
+import re
+
 from .normalize import (aggressive, chosung_of, consonant_runs, has_jamo, level_homoglyph, level_jamo, level_plain,
                         mixed_script_tokens, skeleton)
 
@@ -99,6 +101,8 @@ def inducement_words(text: str) -> list[str]:
     return [w for w in AD_INDUCEMENT if w in plain]
 
 
+_STRUCT = re.compile(r"""["'{}\[\]:;,<>|=()\\/]""")   # JSON·CSS·JS 구조 문자(짧은 키워드의 경계)
+
 # 정규화 단계별 사전 캐시: cat -> [(plain, jamo, homo, full, orig, weight)]
 _NORM: dict[str, list[tuple[str, str, str, str, str, float]]] | None = None
 _CHOSUNG: dict[str, list[tuple[str, str, float]]] | None = None   # cat -> [(초성, orig, weight)]
@@ -186,6 +190,13 @@ def match_keywords_levels(text: str, chosung: bool = True) -> dict[str, list[tup
     t_homo_i = level_homoglyph(text, alt_i=True) if any(c in text for c in "1|!") else t_homo
     t_full = aggressive(text)
     t_full_i = aggressive(text, alt_i=True) if t_homo_i is not t_homo else t_full
+    # 짧은 키워드(영문 ≤8자, 한글 ≤2자)는 JSON/CSS/JS 덩어리에서 따옴표·괄호·콜론 경계를 넘어 글자가 이어 붙어 생기는 우연한 일치
+    # ("s1":"ot" → slot, "…야","한…" → 야한)를 막기 위해 구조 문자를 경계 기호 § 로 바꾼 문자열에서만 찾는다(공백·점·대시 삽입 난독화는 그대로 잡힘).
+    text_s = _STRUCT.sub("§", text) if _STRUCT.search(text) else None
+    if text_s is not None:
+        s_plain, s_jamo, s_homo, s_full = level_plain(text_s), level_jamo(text_s), level_homoglyph(text_s), aggressive(text_s)
+        s_homo_i = level_homoglyph(text_s, alt_i=True) if t_homo_i is not t_homo else s_homo
+        s_full_i = aggressive(text_s, alt_i=True) if t_homo_i is not t_homo else s_full
     cho_hits = chosung_hits(text) if chosung else {}
     mixed_hits = mixed_script_hits(text)
     result: dict[str, list[tuple[str, float, str]]] = {}
@@ -194,13 +205,16 @@ def match_keywords_levels(text: str, chosung: bool = True) -> dict[str, list[tup
         for k_plain, k_jamo, k_homo, k_full, orig, w in items:
             if not k_full:
                 continue
-            if k_plain in t_plain:
+            short = text_s is not None and ((k_plain.isascii() and len(k_plain) <= 8) or len(k_plain) <= 2)
+            tp, tj, th, thi, tf, tfi = (s_plain, s_jamo, s_homo, s_homo_i, s_full, s_full_i) if short else \
+                (t_plain, t_jamo, t_homo, t_homo_i, t_full, t_full_i)
+            if k_plain in tp:
                 hits.append((orig, w, LEVEL_PLAIN))
-            elif k_jamo in t_jamo:
+            elif k_jamo in tj:
                 hits.append((orig, w, LEVEL_JAMO))
-            elif k_homo in t_homo or k_homo in t_homo_i:
+            elif k_homo in th or k_homo in thi:
                 hits.append((orig, w, LEVEL_HOMOGLYPH))
-            elif k_full in t_full or k_full in t_full_i:
+            elif k_full in tf or k_full in tfi:
                 hits.append((orig, w, LEVEL_JAMO if has_jamo(text) else LEVEL_HOMOGLYPH))
         for orig, w, lv in cho_hits.get(cat, []):
             if not any(h[0] == orig for h in hits):

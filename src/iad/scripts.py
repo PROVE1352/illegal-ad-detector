@@ -5,7 +5,7 @@ import base64
 import binascii
 import re
 
-from .links import find_urls_in_text, is_same_site
+from .links import find_urls_in_text, host_of, is_same_site, is_trusted
 
 _B64 = re.compile(r"[\"']([A-Za-z0-9+/]{40,}={0,2})[\"']")
 _REDIRECT = re.compile(
@@ -138,21 +138,25 @@ def analyze_script(code: str, base_host: str) -> tuple[list[tuple[str, str, floa
     decoded, methods = decode_layers(code)
     extra = "\n".join(decoded)
     all_text = code + "\n" + extra
-    urls = [u for u in find_urls_in_text(all_text) if not is_same_site(u, base_host)]
-    has_link_html = bool(re.search(r"<\s*(a|iframe)\b", all_text, re.I))
+    urls = [u for u in find_urls_in_text(all_text) if not is_same_site(u, base_host) and not is_trusted(host_of(u))]
+    from .keywords import match_keywords_levels
+    kw = match_keywords_levels(all_text)
+    bad = bool(urls) or any(w >= 2.0 for hs in kw.values() for _, w, _ in hs)   # 비신뢰 외부 URL 또는 불법 키워드가 있어야 '주입'
+    has_link_html = bool(re.search(r"<\s*(a|iframe)\b[^>]*href=[\"']?https?://", all_text, re.I)) and bad
+    # 정상 사이트의 jQuery 템플릿·분석 스크립트(innerHTML 로 내부 메뉴 생성, 인코딩된 UI 문자열)는 근거 가중치를 낮게 둔다
     if _WRITE.search(code) and (urls or has_link_html):
-        out.append(("script.document_write", "document.write 로 외부 링크/iframe 주입", 3.5))
+        out.append(("script.document_write", "document.write 로 외부 링크/iframe 주입", 3.5 if bad else 1.0))
     if _INNER.search(code) and (urls or has_link_html):
-        out.append(("script.innerhtml", "innerHTML 로 외부 링크/iframe 주입", 3.5))
+        out.append(("script.innerhtml", "innerHTML 로 외부 링크/iframe 주입", 3.5 if bad else 1.0))
     if _INSERT.search(code) and urls:
         out.append(("script.dom_insert", "DOM API 로 외부 링크/iframe 주입", 3))
-    if _EVAL.search(code):
+    if _EVAL.search(code) and bad:
         out.append(("script.eval", "eval/atob/Function 등 난독화 실행", 2))
     if decoded:
-        hidden_html = bool(re.search(r"<\s*(a|iframe|div|span)\b", extra, re.I))
+        hidden_html = bool(re.search(r"<\s*(a|iframe|div|span)\b", extra, re.I)) and bad
         out.append(("script.base64" if methods == ["base64"] else "script.encoded",
-                    f"인코딩 문자열 디코딩({'+'.join(methods)}, {len(decoded)}개)" + (" → HTML/링크 포함" if hidden_html or urls else ""),
-                    1.5 + (2 if (urls or hidden_html) else 0)))
+                    f"인코딩 문자열 디코딩({'+'.join(methods)}, {len(decoded)}개)" + (" → 외부 링크/불법 키워드 포함" if bad else ""),
+                    (1.5 + (2 if (urls or hidden_html) else 0)) if bad else 0.5))
     for m in _REDIRECT.finditer(code):
         target = m.group(1)
         if target.startswith("http") and not is_same_site(target, base_host):

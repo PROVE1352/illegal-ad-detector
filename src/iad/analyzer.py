@@ -29,6 +29,8 @@ SKIP_TAGS = {"script", "style", "head", "title", "meta", "link", "svg", "path", 
 BLOCK_TAGS = {"p", "div", "li", "tr", "td", "th", "table", "ul", "ol", "h1", "h2", "h3", "h4", "section", "article",
               "blockquote", "dl", "dd", "dt", "form", "nav", "header", "footer", "pre"}
 CONTAINER_TAGS = {"div", "td", "article", "section", "li", "dd", "blockquote", "p", "body"}
+FORM_TAGS = {"input", "select", "textarea", "button", "option", "form", "optgroup", "datalist"}
+_DATA_BLOB = re.compile(r"^\s*(\[data-|\{|\[\{|<!\[CDATA|\s*/\*)")
 HIDDEN_WEIGHT = {
     "display_none": 2.5, "visibility_hidden": 2.5, "opacity_zero": 2.5, "font_size_zero": 2.5, "offscreen": 2.5,
     "tiny_size": 2.5, "iframe_1x1": 3, "color_match": 2.5, "hidden_attr": 2.5, "hidden_attribute": 2.5, "marquee": 1.5, "noscript": 2,
@@ -311,8 +313,15 @@ class PageAnalyzer:
     def _comments(self) -> None:
         for c in self.soup.find_all(string=lambda s: isinstance(s, Comment)):
             text = str(c)
-            if not (find_urls_in_text(text) or re.search(r"<a\s", text, re.I) or match_keywords_levels(text)):
-                continue
+            if _DATA_BLOB.match(text) or (len(text) > 4000 and text.count("{") > 20):
+                continue   # 에디터 메타데이터(hwp JSON)·조건부 주석 데이터 덩어리는 광고 흔적이 아니다
+            urls_in = [u for u in find_urls_in_text(text) if not is_same_site(u, self.base_host) and not is_trusted(host_of(u))]
+            kw = match_keywords_levels(text)
+            strong_kw = any(w >= 2.5 for hs in kw.values() for _, w, _ in hs)
+            if not (urls_in or re.search(r"<a\s[^>]*href=[\"']?https?://", text, re.I) or strong_kw):
+                continue   # 약한 키워드(도박·야한·성인 1~1.5)만 있는 주석은 보고하지 않는다
+            if not urls_in and admin_context_score(text, ADMIN_WINDOW) <= ADMIN_EXCLUDE:
+                continue   # '불법도박 신고 안내' 류 행정 문맥 주석
             parent = c.parent if isinstance(c.parent, Tag) else self.soup
             f = self._new(parent)
             f.tag = "#comment"
@@ -323,9 +332,9 @@ class PageAnalyzer:
             f.extra_names.append("HTML_COMMENT")
             f.add("hidden.html_comment", "HTML 주석 안의 링크/키워드", HIDDEN_WEIGHT["html_comment"], "hidden")
             inner = BeautifulSoup(text, "lxml")
-            cats, _ = self._add_keywords(f, inner.get_text(" "), allow_whitelist=False)
+            cats, _ = self._add_keywords(f, inner.get_text(" "), allow_whitelist=True)
             self._add_links(f, inner, text)
-            if f.links or f.has_group("link"):
+            if any(not is_trusted(host_of(u)) for u in f.links) or f.has_group("link"):
                 f.add("link.in_comment", "주석 안 외부 링크", 1.5, "link")
             self._finalize(f, cats)
 
@@ -452,8 +461,11 @@ class PageAnalyzer:
         self._add_links(f, el, text)
         self._idn_homograph(f, el, text)
         untrusted = [u for u in f.links if not is_trusted(host_of(u))]
-        if untrusted and not f.has_group("keyword"):
-            # 접근성 숨김(.sr-only/.blind/skip-link) 안의 공공기관 링크는 정상이므로 비신뢰 도메인 링크만 근거로 삼는다
+        n_anchors = len(el.find_all("a", href=True)) if el.name != "a" else 1
+        # 접근성 숨김 안의 공공기관 링크, 접힌 메뉴(내부 링크가 대부분인 큰 내비게이션)의 외부 링크 한두 개는 정상이므로
+        # 비신뢰 외부 링크가 링크의 절반 이상이거나(≥1개, 링크 ≤4개) 3개 이상 몰려 있을 때만 근거로 삼는다
+        if untrusted and not f.has_group("keyword") and (
+                len(untrusted) >= 3 or (n_anchors <= 4 and len(untrusted) >= 1) or len(untrusted) / max(n_anchors, 1) >= 0.5):
             f.add("link.hidden_external", f"숨긴 요소 안의 외부 링크 ({host_of(untrusted[0])})", 1.5, "link")
             if "HIDDEN_EXTERNAL_LINK" not in f.extra_names:
                 f.extra_names.append("HIDDEN_EXTERNAL_LINK")
@@ -461,6 +473,9 @@ class PageAnalyzer:
         # 숨긴 탭/아코디언 안의 정상 안내문(카지노 관광 안내 등)은 화이트리스트 문맥이 강하면 제외.
         wl_total = sum(w for _, w in match_whitelist(text))
         obfuscated = "obfuscation" in f.techniques   # 숨김 + 난독화가 겹치면 약한 키워드(카지노 1.5)도 고의성이 충분
+        if el.name in FORM_TAGS or (el.name == "input"):
+            # 텍스트 없는 폼 컨트롤(검색 input, hidden input, select)은 '광고 텍스트' 가 아니므로 4종 대상에서 제외(ETC 만)
+            cats = {}
         cat_sum = max(cats.values()) if cats else 0.0
         # 조정안 A: 은닉이 확정된 요소에서 중위 키워드(≥1.5) 하나뿐이라도 광고 유도 보조어(무료·체험·가입·쿠폰·바로가기…)가 함께 있고
         # 행정·정상 문맥어가 전혀 없으면 광고로 본다(요강 예시 f_004 "무료 슬롯 체험 바로가기" 꼴). 숨긴 탭의 "카지노 관광 안내" 는 문맥어로 제외.
