@@ -164,7 +164,7 @@ class Crawler:
     def _fetch_css(self, url: str) -> str | None:
         if url in self.css_cache:
             return self.css_cache[url]
-        if len([v for v in self.css_cache.values() if v is not None]) >= self.cfg.max_css_files:
+        if len(self.css_cache) >= self.cfg.max_css_files:   # 실패한 시도도 세어 깨진 링크가 많은 사이트에서 타임아웃이 쌓이지 않게
             return None
         if self.cfg.allowed_hosts is not None and host_of(url) not in self.cfg.allowed_hosts:
             return None

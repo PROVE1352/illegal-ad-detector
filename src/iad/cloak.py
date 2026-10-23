@@ -59,8 +59,11 @@ def check_cloaking(crawler: Crawler, pages: list[Page], normal_findings: list[Fi
     sess = requests.Session()
     sess.headers["Accept-Language"] = "ko-KR,ko;q=0.9"
     n_req = 0
+    t_start = crawler.started or time.monotonic()
     for page in targets:
-        if not crawler._budget_left():  # noqa: SLF001
+        # 크롤이 max_pages 로 끝난 뒤에도 돌아야 하므로 시간 예산만 본다(페이지 수 상한과 무관)
+        if time.monotonic() - t_start > crawler.cfg.time_budget_sec or getattr(crawler, "_stop", False):
+            log("클로킹 점검: 시간 예산 소진으로 중단")
             break
         normal = by_url.get(page.report_url, [])
         normal_locs = {f.location for f in normal}

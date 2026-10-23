@@ -453,3 +453,34 @@ def test_r1_weak_categories_detected(html, want):
 def test_r1_hard_negatives(html):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
     assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
+
+
+def test_cloaking_runs_after_max_pages_reached():
+    """크롤이 max_pages 로 끝나도(pages_fetched >= max_pages) 클로킹 점검은 시간 예산만 보고 계속 요청해야 한다."""
+    import threading, time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from iad.cloak import check_cloaking
+    from iad.crawler import Crawler, CrawlConfig
+    hits = []
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):  # noqa: D102
+            pass
+
+        def do_GET(self):
+            hits.append(self.headers.get("User-Agent", ""))
+            self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.end_headers()
+            self.wfile.write(b"<html><body><p>ok</p></body></html>")
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_port}"
+    try:
+        c = Crawler(base + "/a.html", CrawlConfig(delay=0, max_pages=1, allowed_hosts=("127.0.0.1",)))
+        pages = list(c.crawl())
+        assert c.pages_fetched >= 1 and not c._budget_left()
+        n0 = len(hits)
+        check_cloaking(c, pages, [], "127.0.0.1", 10, lambda m: None)
+    finally:
+        srv.shutdown()
+    assert len(hits) - n0 >= 2 and any("Yeti" in u for u in hits)
