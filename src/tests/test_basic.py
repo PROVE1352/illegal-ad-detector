@@ -484,3 +484,19 @@ def test_cloaking_runs_after_max_pages_reached():
     finally:
         srv.shutdown()
     assert len(hits) - n0 >= 2 and any("Yeti" in u for u in hits)
+
+
+# ---------- AR7: 평문 키워드 없는 유사문자 치환 단어(스크립트 혼용 1급 신호) ----------
+@pytest.mark.parametrize("text", ["саѕіnо 입장", "bеt 365", "ѕlоtѕ", "wіn 보너스", "роkеr 룸", "ＴＯＴＯ 사이트", "ＢＥＴ 추천", "t0t0",
+                                  "b3t 추천", "c@$ino", "Ꮯasino", "ꭲoto 사이트", "lоan 상담", "ｍｅｇａ－ＢＥＴ 첫충 30％"])
+def test_mixed_script_homoglyph_detected(text):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body><p>{text}</p></body></html>"), "ex.go.kr")
+    assert "HOMOGLYPH" in {c for f in fs for c in f.official}, text
+
+
+@pytest.mark.parametrize("text", ["ＷＩＮ－ＷＩＮ 협약 체결", "ＴＶ 방송 ＰＣ 지원", "covid19 안내", "Казино Москва закрыто", "Добро пожаловать",
+                                  "iPhone 15 Pro", "win10 설치", "카지노 bar 안내", "Ｗｉｎｄｏｗｓ 업데이트", "α-test 결과", "β버전 출시",
+                                  "alphabet song", "sports day 2026", "Tibet trip"])
+def test_mixed_script_hard_negatives(text):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body><p>{text}</p></body></html>"), "ex.go.kr")
+    assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]

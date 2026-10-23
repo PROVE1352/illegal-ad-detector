@@ -5,7 +5,8 @@
 """
 from __future__ import annotations
 
-from .normalize import aggressive, chosung_of, consonant_runs, has_jamo, level_homoglyph, level_jamo, level_plain
+from .normalize import (aggressive, chosung_of, consonant_runs, has_jamo, level_homoglyph, level_jamo, level_plain,
+                        mixed_script_tokens, skeleton)
 
 CATEGORY_LABEL = {
     "gambling": "도박",
@@ -77,6 +78,16 @@ CHOSUNG_2CHAR_BLOCK = {"ㅇㄷ", "ㅁㅊ", "ㅊㅊ", "ㄱㅈ", "ㅈㅈ", "ㄱㅅ
 CHOSUNG_CONTEXT = ("사이트", "추천", "가입", "코드", "보너스", "입금", "환전", "배팅", "베팅", "머니", "이벤트", "주소", "도메인",
                    "링크", "바로가기", "텔레", "카톡", "문의", "출장", "만남", "대출", "승인", "입플", "첫충", "매충", "꽁")
 
+# 스크립트 혼용(유사문자 위장) 토큰의 골격에서만 찾는 영문 도박어. 평문 'bet'·'win' 은 일반 영문에 흔해 사전에 넣지 않지만,
+# 키릴·그리스·전각·leet 로 위장한 단어 안에서 복원되면 위장 자체가 신호이므로 인정한다. 전각만(ＷＩＮ, IME 입력) 인 토큰은 가중치 ≥2 만.
+MIXED_TERMS: list[tuple[str, float]] = [
+    ("casino", 3), ("baccarat", 3), ("toto", 2.5), ("slot", 2), ("slots", 2), ("bet", 2), ("betting", 2.5), ("poker", 2),
+    ("holdem", 2.5), ("jackpot", 2.5), ("roulette", 2), ("blackjack", 2), ("gambling", 2), ("sportsbet", 3), ("freespin", 3),
+    ("freebet", 3), ("bookmaker", 2.5), ("lotto", 2), ("lottery", 2), ("wager", 2.5), ("keno", 2), ("bingo", 1.5),
+    ("win", 1.0), ("spin", 1.5), ("bonus", 1.5), ("powerball", 2.5), ("pachinko", 2.5), ("megabet", 3), ("sexy", 1.5),
+    ("porn", 3), ("adult", 1.5), ("loan", 1.5), ("cash", 1.5),
+]
+
 # 정규화 단계별 사전 캐시: cat -> [(plain, jamo, homo, full, orig, weight)]
 _NORM: dict[str, list[tuple[str, str, str, str, str, float]]] | None = None
 _CHOSUNG: dict[str, list[tuple[str, str, float]]] | None = None   # cat -> [(초성, orig, weight)]
@@ -125,6 +136,29 @@ def chosung_hits(text: str) -> dict[str, list[tuple[str, float, str]]]:
     return out
 
 
+def mixed_script_hits(text: str) -> dict[str, list[tuple[str, float, str]]]:
+    """스크립트 혼용 토큰의 골격을 사전(한국어 사전 + MIXED_TERMS)과 대조한다. 레벨은 HOMOGLYPH."""
+    toks = mixed_script_tokens(text)
+    if not toks:
+        return {}
+    _prepare()
+    assert _NORM is not None
+    out: dict[str, list[tuple[str, float, str]]] = {}
+    for tok, kind in toks:
+        sks = {skeleton(tok), skeleton(tok, alt_i=True)}
+        for cat, items in _NORM.items():
+            for _p, _j, _h, k_full, orig, w in items:
+                if w >= 1.0 and k_full and any(k_full in sk for sk in sks):
+                    if kind == "fullwidth" and w < 2:
+                        continue
+                    out.setdefault(cat, []).append((orig, w, LEVEL_HOMOGLYPH))
+        for term, w in MIXED_TERMS:
+            if any(term in sk for sk in sks) and not (kind == "fullwidth" and w < 2):
+                cat = "adult" if term in ("sexy", "porn", "adult") else "finance" if term in ("loan", "cash") else "gambling"
+                out.setdefault(cat, []).append((term, w, LEVEL_HOMOGLYPH))
+    return out
+
+
 def match_keywords_levels(text: str, chosung: bool = True) -> dict[str, list[tuple[str, float, str]]]:
     """카테고리별 (키워드, 가중치, 레벨). 레벨: plain / JAMO / HOMOGLYPH / both.
 
@@ -142,6 +176,7 @@ def match_keywords_levels(text: str, chosung: bool = True) -> dict[str, list[tup
     t_full = aggressive(text)
     t_full_i = aggressive(text, alt_i=True) if t_homo_i is not t_homo else t_full
     cho_hits = chosung_hits(text) if chosung else {}
+    mixed_hits = mixed_script_hits(text)
     result: dict[str, list[tuple[str, float, str]]] = {}
     for cat, items in _NORM.items():
         hits: list[tuple[str, float, str]] = []
@@ -157,6 +192,9 @@ def match_keywords_levels(text: str, chosung: bool = True) -> dict[str, list[tup
             elif k_full in t_full or k_full in t_full_i:
                 hits.append((orig, w, LEVEL_JAMO if has_jamo(text) else LEVEL_HOMOGLYPH))
         for orig, w, lv in cho_hits.get(cat, []):
+            if not any(h[0] == orig for h in hits):
+                hits.append((orig, w, lv))
+        for orig, w, lv in mixed_hits.get(cat, []):
             if not any(h[0] == orig for h in hits):
                 hits.append((orig, w, lv))
         pruned = [h for h in hits if not any(h[0] != o[0] and h[0] in o[0] for o in hits)]

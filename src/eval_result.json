@@ -1,29 +1,29 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 12:20:48",
+  "timestamp": "2026-10-23 12:32:56",
   "depth": 3,
   "max_pages": 300,
-  "port": 53001
+  "port": 58496
  },
  "results": [
   {
    "set": "dev",
-   "entry_url": "http://127.0.0.1:53001/dev/index.html",
-   "pages_crawled": 28,
-   "elapsed_sec": 0.2,
-   "tool_elapsed_sec": 0.193224,
+   "entry_url": "http://127.0.0.1:58496/dev/index.html",
+   "pages_crawled": 29,
+   "elapsed_sec": 0.22,
+   "tool_elapsed_sec": 0.211261,
    "official": {
-    "gold": 38,
-    "reported_units": 38,
-    "tp": 38,
+    "gold": 42,
+    "reported_units": 42,
+    "tp": 42,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
     "f1": 1.0,
     "per_technique": {
      "HOMOGLYPH": {
-      "gold": 7,
-      "hit": 7,
+      "gold": 11,
+      "hit": 11,
       "recall": 1.0
      },
      "JAMO": {
@@ -55,26 +55,26 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_lw6dn1za"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev__na4tije"
   },
   {
    "set": "holdout",
-   "entry_url": "http://127.0.0.1:53001/holdout/index.html",
-   "pages_crawled": 28,
-   "elapsed_sec": 0.14,
-   "tool_elapsed_sec": 0.130718,
+   "entry_url": "http://127.0.0.1:58496/holdout/index.html",
+   "pages_crawled": 29,
+   "elapsed_sec": 0.15,
+   "tool_elapsed_sec": 0.144466,
    "official": {
-    "gold": 38,
-    "reported_units": 38,
-    "tp": 38,
+    "gold": 42,
+    "reported_units": 42,
+    "tp": 42,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
     "f1": 1.0,
     "per_technique": {
      "HOMOGLYPH": {
-      "gold": 7,
-      "hit": 7,
+      "gold": 11,
+      "hit": 11,
       "recall": 1.0
      },
      "JAMO": {
@@ -106,7 +106,7 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_ak19jfdz"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout__zo9e7lm"
   }
  ]
 }

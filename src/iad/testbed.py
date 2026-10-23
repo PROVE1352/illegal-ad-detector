@@ -330,6 +330,18 @@ class Site:
         for eid, code in ((r1, "OFFSCREEN"), (r2, "JAMO"), (r3, "JAMO"), (r4, "HOMOGLYPH"), (r5, "HOMOGLYPH")):
             self.label("post/post_r1.html", eid, code, "도박")
 
+        # 레드팀 R2: 평문 키워드 없이 유사문자 치환만으로 된 단어(키릴 전체·전각·leet·체로키) + 정상 영문/러시아어/전각 약어 하드 네거티브
+        q1, q2, q3, q4 = (self.nid() for _ in range(4))
+        add("post/post_r2.html", "국제교류 소식",
+            f'<p>자매도시 대표단 방문: {"Добро пожаловать в Сеул" if not v else "Казино Москва закрыто, туризм 2026"}</p>'
+            f'<p>ＷＩＮ－ＷＩＮ 협약, ＴＶ 중계, ＰＣ 지원, Ｗｉｎｄｏｗｓ 업데이트, covid19 지침, win10 설치, iPhone 15</p>'
+            f'<p id="{q1}">{"саѕіnо 입장 안내" if not v else "ѕlоtѕ 체험 입장"}</p>'
+            f'<p id="{q2}">{"ＴＯＴＯ 가입" if not v else "ＢＥＴ 추천"}</p>'
+            f'<p id="{q3}">{"b3t 추천 코드" if not v else "c@$ino 코드 999"}</p>'
+            f'<p id="{q4}">{"Ꮯasino 라이브" if not v else "ꭲoto 사이트"}</p>', ["감사합니다"])
+        for eid in (q1, q2, q3, q4):
+            self.label("post/post_r2.html", eid, "HOMOGLYPH", "도박")
+
         # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
         k1 = self.nid()
         normal_body = "<p>시민 제안 공모를 안내합니다. 접수: 10/20~11/5</p>"

@@ -27,6 +27,15 @@ HOMOGLYPHS = {
 }
 # 숫자 1/|/! 은 l 과 i 둘 다로 읽힐 수 있어(cas1no, s1ot) 대체 변형을 하나 더 만든다
 _ALT_I = {"1": "i", "|": "i", "!": "i", "l": "l"}
+# 유니코드 confusables 보강(소문자화 뒤 적용): 체로키·아르메니아·기호. 한 단어 안 스크립트 혼용 토큰의 골격 복원에 쓴다.
+CONFUSABLES_EXTRA = {
+    "ꭺ": "a", "ꮯ": "c", "ꭰ": "d", "ꭼ": "e", "ꮐ": "g", "ꮋ": "h", "ꭵ": "i", "ꭻ": "j", "ꮶ": "k", "ꮮ": "l", "ꮇ": "m", "ꮑ": "n",
+    "ꮎ": "o", "ꮲ": "p", "ꮢ": "r", "ꮪ": "s", "ꭲ": "t", "ꮩ": "v", "ꮃ": "w", "ꭹ": "y", "ꮓ": "z",
+    "օ": "o", "ս": "u", "ո": "n", "ց": "g", "ա": "a", "ե": "e", "ѕ": "s", "є": "e", "ԁ": "d", "ԛ": "q", "ԝ": "w", "ӡ": "z",
+    "€": "e", "£": "l", "¢": "c", "§": "s", "†": "t", "+": "t", "¥": "y", "¡": "i", "ƒ": "f", "ɒ": "a", "ʏ": "y", "ᴀ": "a",
+    "ᴄ": "c", "ᴇ": "e", "ᴏ": "o", "ᴘ": "p", "ᴛ": "t", "ᴜ": "u", "ᴠ": "v", "ᴡ": "w", "ᴢ": "z", "ʙ": "b", "ɢ": "g", "ʜ": "h",
+    "ɪ": "i", "ᴊ": "j", "ᴋ": "k", "ʟ": "l", "ᴍ": "m", "ʀ": "r", "ꜱ": "s",
+}
 
 _ZERO_WIDTH = re.compile("[​‌‍⁠﻿­͏ᅟᅠㅤ]")
 _EMOJI = re.compile(
@@ -160,7 +169,58 @@ def has_homoglyph_chars(text: str) -> bool:
     for tok in _WORD.findall(t):
         if _CYRILLIC_GREEK.search(tok) and (_LATIN.search(tok) or _HANGUL.search(tok) or re.search(r"\d", tok)):
             return True
-    return False
+    return bool(mixed_script_tokens(t))
+
+
+# ---------- 스크립트 혼용 토큰(1급 HOMOGLYPH 신호) ----------
+_TOKEN = re.compile(r"[\w@$!|€£¢§†+¡\uff01-\uff5e\u13a0-\u13ff\u0530-\u058f\u1d00-\u1d7f\ua730-\ua7ff\uab70-\uabbf]+")
+_RANGES = (
+    ("latin", re.compile(r"[a-zA-Z\u00c0-\u024f]")), ("cyrillic", re.compile("[\u0400-\u04ff]")),
+    ("greek", re.compile("[\u0370-\u03ff]")), ("hangul", re.compile("[\uac00-\ud7a3\u3131-\u3163]")),
+    ("fullwidth", re.compile("[\uff10-\uff19\uff21-\uff3a\uff41-\uff5a]")), ("digit", re.compile("[0-9]")),
+    ("other", re.compile("[\u13a0-\u13ff\u0530-\u058f\u1d00-\u1d7f\ua730-\ua7ff\uab70-\uabbf]")),   # 기호(@$!…)는 글자 사이(leet)일 때만
+)
+_LEET_INSIDE = re.compile(r"[a-z][0-9@$!|€£¢§†+¡]+[a-z]")
+
+
+def token_scripts(tok: str) -> set[str]:
+    return {name for name, rx in _RANGES if rx.search(tok)}
+
+
+def mixed_script_tokens(text: str) -> list[tuple[str, str]]:
+    """한 단어 안에 스크립트가 섞인 토큰 [(토큰, 종류)]. 종류: 'mixed'(키릴·그리스·체로키 등 + 라틴/한글/숫자),
+    'leet'(라틴 글자 사이에 숫자·기호), 'fullwidth'(전각 영문자 포함). 정상 러시아어 단어(순수 키릴)·'covid19'(숫자가 끝) 는 제외."""
+    out: list[tuple[str, str]] = []
+    for tok in _TOKEN.findall(text or ""):
+        tok = tok.strip("@$!|€£¢§†+¡_")   # 멘션(@vip)·가격($10) 등 가장자리 기호는 위장이 아니다
+        if len(tok) < 3 or tok.isdigit():
+            continue
+        sc = token_scripts(tok)
+        disguise = sc & {"cyrillic", "greek", "other"}
+        base = sc & {"latin", "hangul", "digit", "fullwidth"}
+        if disguise and (base or len(disguise) > 1):
+            out.append((tok, "mixed"))
+        elif re.search("[\uff21-\uff3a\uff41-\uff5a]", tok):
+            out.append((tok, "fullwidth"))
+        elif "latin" in sc and _LEET_INSIDE.search(tok.lower()):
+            out.append((tok, "leet"))
+    return out
+
+
+def skeleton(tok: str, alt_i: bool = False) -> str:
+    """혼용 토큰을 라틴/한글 골격으로 되돌린다(NFKC → 소문자 → confusables/leet 치환 → 영숫자·한글만)."""
+    t = unicodedata.normalize("NFKC", tok).lower()
+    out = []
+    for c in t:
+        if alt_i and c in _ALT_I:
+            out.append(_ALT_I[c])
+        elif c in HOMOGLYPHS:
+            out.append(HOMOGLYPHS[c])
+        elif c in CONFUSABLES_EXTRA:
+            out.append(CONFUSABLES_EXTRA[c])
+        else:
+            out.append(c)
+    return re.sub(r"[^0-9a-z\uac00-\ud7a3]", "", "".join(out))
 
 
 def chosung_of(word: str) -> str | None:
