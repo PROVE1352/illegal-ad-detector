@@ -11,7 +11,10 @@ src/
   iad/
     __main__.py       CLI  python -m iad --url URL [--depth 3 --max-pages 300 --delay 0.3 --out DIR --result-dir DIR --render]
     scan.py           파이프라인: 크롤 → 분석 → result.json/result_extra.json → report.html/csv/json
-    crawler.py        동일 도메인 BFS, 페이지네이션, iframe(동일 도메인=추적, 외부=1단계 수집+플래그), robots 옵션,
+    crawler.py        동일 도메인 우선순위 BFS(진입 경로 상세 > 페이지네이션 > 진입 경로 > 다른 영역 상세 > 게시판 영역 > 그 외),
+                      링크 소스: href·javascript:/onclick 핸들러 안 URL·data-href/url/link·rel=next/prev·meta refresh·
+                      인라인 스크립트 안 동일 사이트 경로(.do/.jsp/.php/.html…, 댓글 목록 URL 등), 지연 로딩 iframe(data-src),
+                      iframe(동일 도메인=추적, 외부=1단계 수집+플래그, 중첩 3단계), robots 옵션,
                       EUC-KR 처리, 시간 예산(기본 20분)·최대 페이지(기본 300) 상한,
                       동일 사이트 외부 CSS(<link rel=stylesheet>, @import 1단계) 수집(URL 당 1회 캐시, 최대 40개)
     analyzer.py       페이지 분석기. 요강 location 규칙, 4종 technique 판정, 추가 유형(ETC)

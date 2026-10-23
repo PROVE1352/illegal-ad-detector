@@ -1,6 +1,7 @@
 """동일 도메인 BFS 크롤러: 게시판 목록/상세/페이지네이션, iframe 추적, robots.txt 옵션, EUC-KR 처리, 시간 예산."""
 from __future__ import annotations
 
+import heapq
 import re
 import time
 import urllib.robotparser as robotparser
@@ -17,7 +18,17 @@ from .models import Page
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) IllegalAdDetector/0.1 (+public-site-audit)"
 SKIP_EXT = re.compile(r"\.(?:jpg|jpeg|png|gif|webp|svg|ico|bmp|pdf|zip|7z|rar|hwp|hwpx|doc|docx|xls|xlsx|ppt|pptx|"
                       r"mp3|mp4|avi|mov|wmv|css|js|json|xml|rss|exe|apk|txt|csv|woff2?|ttf|eot)(?:\?|#|$)", re.I)
-SKIP_PATH_HINTS = ("logout", "login", "download", "fileDown", "/file/", "print", "mailto:", "javascript:")
+SKIP_SEGMENTS = {"logout", "login", "signin", "signout", "download", "filedown", "filedownload", "print", "printpage",
+                 "file", "files", "attach", "attachfile"}
+SKIP_QUERY_HINTS = re.compile(r"(?:^|[?&])(?:mode|cmd|act|action)=(?:download|print|logout|login|filedown)", re.I)
+# 탐색 우선순위 패턴(게시판 상세 > 목록·페이지네이션 > 게시판 영역 > 그 외)
+DETAIL_HINTS = re.compile(r"(?:view|read|detail|article|content|cont|show)(?:[./?_-]|$)|(?:[?&](?:nttId|ntt_id|idx|seq|no|id|articleNo|"
+                          r"bbsSeq|boardSeq|postId|post_id|docId|dataSid|nttSn|bIdx|b_idx|wr_id|num)=)", re.I)
+PAGING_HINTS = re.compile(r"[?&](?:page|pageIndex|pageNo|pageNum|pageunit|cpage|currentPage|curPage|p|pg|start|offset|pageNumber)=\d+", re.I)
+BOARD_HINTS = re.compile(r"(?:board|bbs|notice|news|community|forum|comment|reply|cmt|qna|faq|free|guest|post|article|list)", re.I)
+_PATH_IN_JS = re.compile(r"[\"'](/[\w\-./%]+\.(?:do|jsp|php|html?|asp|aspx|action|cgi)(?:\?[^\"'\s<>]*)?)[\"']")
+_URL_IN_HANDLER = re.compile(r"(?:location(?:\.href|\.replace|\.assign)?\s*(?:=|\()|window\.open\s*\(|open\s*\()\s*[\"']([^\"']+)[\"']", re.I)
+_ANY_PATH_IN_HANDLER = re.compile(r"[\"']((?:https?://|/)[^\"'\s<>]+)[\"']")
 
 
 @dataclass
@@ -87,6 +98,8 @@ class Crawler:
         self.stopped_reason = ""
         self._stop = False
         self.css_cache: dict[str, str | None] = {}   # 스타일시트 URL → 본문(실패면 None)
+        self._counter = 0
+        self._entry_dir = urlparse(start_url).path.rsplit("/", 1)[0] + "/"
         self.robots: robotparser.RobotFileParser | None = None
         if self.cfg.respect_robots:
             self.robots = robotparser.RobotFileParser()
@@ -201,35 +214,106 @@ class Crawler:
             out.append(css)
         return out
 
+    @staticmethod
+    def _handler_urls(code: str) -> list[str]:
+        """onclick / javascript: 핸들러 안에서 이동 대상으로 보이는 URL·경로를 뽑는다."""
+        out = [m.group(1) for m in _URL_IN_HANDLER.finditer(code)]
+        if not out:
+            out = [m.group(1) for m in _ANY_PATH_IN_HANDLER.finditer(code)]
+        return [u for u in out if u and not u.startswith(("#", "javascript:", "mailto:", "tel:"))]
+
     def extract_links(self, page: Page, soup: BeautifulSoup) -> Iterator[str]:
         for a in soup.find_all(["a", "area"], href=True):
             href = str(a["href"]).strip()
-            if not href or href.startswith(("#", "javascript:", "mailto:", "tel:")):
+            if not href or href.startswith(("#", "mailto:", "tel:")):
+                continue
+            if href.lower().startswith("javascript:"):
+                for u in self._handler_urls(href):
+                    yield urljoin(page.url, u)
                 continue
             yield urljoin(page.url, href)
         for el in soup.find_all(attrs={"onclick": True}):
-            m = re.search(r"location(?:\.href)?\s*=\s*['\"]([^'\"]+)['\"]", str(el["onclick"]))
-            if m:
-                yield urljoin(page.url, m.group(1))
+            for u in self._handler_urls(str(el["onclick"])):
+                yield urljoin(page.url, u)
+        for attr in ("data-href", "data-url", "data-link"):
+            for el in soup.find_all(attrs={attr: True}):
+                v = str(el[attr]).strip()
+                if v and not v.startswith(("#", "javascript:")):
+                    yield urljoin(page.url, v)
+        for ln in soup.find_all("link", href=True):
+            rel = " ".join(ln.get("rel") or []).lower() if isinstance(ln.get("rel"), list) else str(ln.get("rel", "")).lower()
+            if rel in ("next", "prev", "canonical"):
+                yield urljoin(page.url, str(ln["href"]))
+        for m in soup.find_all("meta"):
+            if str(m.get("http-equiv", "")).lower() == "refresh":
+                mm = re.search(r"url\s*=\s*[\"']?([^\"';]+)", str(m.get("content", "")), re.I)
+                if mm:
+                    yield urljoin(page.url, mm.group(1).strip())
+        # 인라인 스크립트 안의 동일 사이트 경로(JS 로만 이동하는 게시판·댓글 목록 URL), 페이지당 20개까지
+        n = 0
+        for sc in soup.find_all("script"):
+            for mm in _PATH_IN_JS.finditer(sc.get_text() or ""):
+                yield urljoin(page.url, mm.group(1))
+                n += 1
+                if n >= 20:
+                    break
+            if n >= 20:
+                break
+
+    @staticmethod
+    def _skip_link(link: str) -> bool:
+        p = urlparse(link)
+        segs = {seg.lower().split(".")[0] for seg in p.path.split("/") if seg}   # 'login.do' → 'login'
+        if segs & SKIP_SEGMENTS:
+            return True
+        if SKIP_QUERY_HINTS.search("?" + p.query):
+            return True
+        return False
+
+    def _priority(self, link: str, entry_dir: str) -> int:
+        p = urlparse(link)
+        same_dir = p.path.startswith(entry_dir)
+        full = p.path + ("?" + p.query if p.query else "")
+        if same_dir and DETAIL_HINTS.search(full):
+            return 0
+        if same_dir:
+            return 1 if PAGING_HINTS.search(full) else 2
+        if DETAIL_HINTS.search(full) or PAGING_HINTS.search(full):
+            return 3
+        return 4 if BOARD_HINTS.search(full) else 5
 
     def extract_frames(self, page: Page, soup: BeautifulSoup) -> Iterator[tuple[str, str]]:
         """(절대 src, location 접두어 세그먼트)"""
-        for fr in soup.find_all(["iframe", "frame"], src=True):
-            src = str(fr["src"]).strip()
+        for fr in soup.find_all(["iframe", "frame"]):
+            src = str(fr.get("src") or "").strip()
+            if (not src or src.startswith(("about:", "javascript:", "data:"))) and fr.get("data-src"):
+                src = str(fr["data-src"]).strip()   # 지연 로딩 iframe
             if not src or src.startswith(("about:", "javascript:", "data:")):
                 continue
             abs_src = urljoin(page.url, src)
             yield abs_src, f'iframe[src="{abs_src}"] >>> '
 
+    def _enqueue(self, queue: list, link: str, depth: int, parent: str) -> None:
+        if not link.startswith(("http://", "https://")) or SKIP_EXT.search(link) or self._skip_link(link):
+            return
+        if not is_same_site(link, self.base_host):
+            return
+        key = normalize_url(link)
+        if key in self.seen:
+            return
+        self.seen.add(key)
+        self._counter += 1
+        # 우선순위 큐: (게시판 상세 > 목록·페이지네이션 > 진입 경로 > 다른 영역 상세 > 게시판스러운 영역 > 그 외), 같은 순위면 얕은 깊이·발견 순서
+        heapq.heappush(queue, (self._priority(link, self._entry_dir), depth, self._counter, link.split("#", 1)[0], parent))
+
     def crawl(self) -> Iterator[Page]:
         self.started = time.monotonic()
-        queue: list[tuple[str, int, str | None]] = [(self.start_url, 0, None)]
+        self._counter = 0
+        self._entry_dir = urlparse(self.start_url).path.rsplit("/", 1)[0] + "/"
+        queue: list[tuple[int, int, int, str, str | None]] = [(0, 0, 0, self.start_url, None)]
         self.seen.add(normalize_url(self.start_url))
-        entry_dir = urlparse(self.start_url).path.rsplit("/", 1)[0] + "/"
         while queue and self._budget_left():
-            # 진입 URL 과 같은 경로(게시판) 아래 링크를 먼저 처리해 게시글·페이지네이션을 우선 수집
-            idx = next((i for i, (u, _, _) in enumerate(queue) if urlparse(u).path.startswith(entry_dir)), 0)
-            url, depth, parent = queue.pop(idx)
+            _prio, depth, _n, url, parent = heapq.heappop(queue)
             if not self._allowed(url):
                 self.log(f"robots.txt 차단: {url}")
                 continue
@@ -247,17 +331,7 @@ class Crawler:
             if depth >= self.cfg.depth:
                 continue
             for link in self.extract_links(page, soup):
-                if not link.startswith(("http://", "https://")) or SKIP_EXT.search(link):
-                    continue
-                if any(h in link for h in SKIP_PATH_HINTS):
-                    continue
-                if not is_same_site(link, self.base_host):
-                    continue
-                key = normalize_url(link)
-                if key in self.seen:
-                    continue
-                self.seen.add(key)
-                queue.append((link.split("#", 1)[0], depth + 1, page.url))
+                self._enqueue(queue, link, depth + 1, page.url)
         if self.stopped_reason:
             self.log(self.stopped_reason)
 
@@ -289,8 +363,4 @@ class Crawler:
             yield from self._crawl_frames(fp, fsoup, depth + 1, queue, nest + 1)
             if same and depth + 1 < self.cfg.depth:
                 for link in self.extract_links(fp, fsoup):
-                    if is_same_site(link, self.base_host) and not SKIP_EXT.search(link):
-                        k = normalize_url(link)
-                        if k not in self.seen:
-                            self.seen.add(k)
-                            queue.append((link.split("#", 1)[0], depth + 2, fp.url))
+                    self._enqueue(queue, link, depth + 2, fp.url)

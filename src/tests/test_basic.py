@@ -333,3 +333,37 @@ def test_cloaking_detects_bot_only_content_and_redirect():
     names = {n for f in fs for n in f.extra_names}
     assert "CLOAKING_OFFSCREEN" in names and "CLOAKING_REDIRECT" in names, names
     assert all(not f.official for f in fs)   # 봇 전용 DOM 은 result.json 에 넣지 않는다
+
+
+# ---------- 탐색 커버리지 ----------
+def test_crawler_link_extraction_and_priority():
+    from iad.crawler import Crawler, CrawlConfig
+    c = Crawler("http://ex.go.kr/board/list.do?bbsId=B1", CrawlConfig(allowed_hosts=()))
+    html = '''<html><head><link rel="next" href="/board/list.do?bbsId=B1&pageIndex=2"></head><body>
+    <a href="javascript:fn_view('123')" onclick="location.href='/board/view.do?nttId=123';return false;">글</a>
+    <a href="#none" onclick="window.open('/board/view.do?nttId=124')">글2</a>
+    <tr data-href="/board/view.do?nttId=125"></tr>
+    <a href="/member/login.do">로그인</a><a href="/board/download.do?f=1">첨부</a><a href="/blueprint/plan.html">계획</a>
+    <a href="/about/print.do">인쇄</a><a href="/board/view.do?nttId=1&mode=download">다운</a>
+    <script>function cm(){ $.get("/board/comment/list.do?nttId=123"); }</script>
+    <a href="/intro/greeting.do">인사말</a></body></html>'''
+    soup = BeautifulSoup(html, "lxml")
+    links = list(c.extract_links(Page(url="http://ex.go.kr/board/list.do?bbsId=B1", html=html), soup))
+    assert "http://ex.go.kr/board/view.do?nttId=123" in links and "http://ex.go.kr/board/view.do?nttId=124" in links
+    assert "http://ex.go.kr/board/view.do?nttId=125" in links and "http://ex.go.kr/board/comment/list.do?nttId=123" in links
+    assert "http://ex.go.kr/board/list.do?bbsId=B1&pageIndex=2" in links
+    assert c._skip_link("http://ex.go.kr/member/login.do") and c._skip_link("http://ex.go.kr/board/download.do?f=1")
+    assert c._skip_link("http://ex.go.kr/about/print.do") and c._skip_link("http://ex.go.kr/board/view.do?nttId=1&mode=download")
+    assert not c._skip_link("http://ex.go.kr/blueprint/plan.html")   # 'print' 부분 문자열로 건너뛰면 안 됨
+    pr = c._priority
+    d = "/board/"
+    assert pr("http://ex.go.kr/board/view.do?nttId=123", d) < pr("http://ex.go.kr/board/list.do?pageIndex=2", d) \
+        < pr("http://ex.go.kr/board/etc.do", d) < pr("http://ex.go.kr/news/view.do?id=3", d) < pr("http://ex.go.kr/intro/greeting.do", d)
+
+
+def test_crawler_lazy_iframe_data_src():
+    from iad.crawler import Crawler, CrawlConfig
+    c = Crawler("http://ex.go.kr/a.html", CrawlConfig(allowed_hosts=()))
+    soup = BeautifulSoup('<html><body><iframe data-src="/w/x.html"></iframe><iframe src="about:blank" data-src="w/y.html"></iframe></body></html>', "lxml")
+    srcs = [u for u, _ in c.extract_frames(Page(url="http://ex.go.kr/a.html", html=""), soup)]
+    assert srcs == ["http://ex.go.kr/w/x.html", "http://ex.go.kr/w/y.html"]
