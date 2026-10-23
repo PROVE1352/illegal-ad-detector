@@ -823,3 +823,40 @@ def test_post_board_end_to_end(tmp_path):
     urls = {f.page_url for f in res.findings if f.official}
     assert f"http://127.0.0.1:{port}/dev/egov/view.do?nttId=3" in urls and f"http://127.0.0.1:{port}/dev/egov/view.do?nttId=5" in urls
     assert {c for f in res.findings for c in f.official} >= {"OFFSCREEN", "JAMO"}
+
+
+# ---------- 아르곤 2차 검토 중 '이미 충족' 항목의 회귀 고정 ----------
+@pytest.mark.parametrize("html,code", [
+    ('<a href="/x">ｍｅｇａ－ＢＥＴ 신규 30％ 지급</a>', "HOMOGLYPH"), ('<a href="/x">ＶＩＰ－ＳＬＯＴ 가입 이벤트</a>', "HOMOGLYPH"),   # B-① 전각 영문 도박어
+    ('<span>ㅋ ㅏ ㅈ ㅣ ㄴ ㅗ 보너스</span>', "JAMO"), ('<span class="blind">카ㅈㅣ노 보너스 바ㅋㅏ라 코드</span>', "JAMO"),          # #7 공백·혼합 자모
+    ('<div class="article-body"><p>불법도박 예방 안내 1336</p><p>ｍｅｇａ－ＢＥＴ 카지노 쿠폰</p></div>', "HOMOGLYPH"),         # D/#10 이웃 문단 행정어
+    ('<style>.article-body .blind-text{display:none}</style><div class="article-body"><p class="blind-text">토토사이트 추천</p></div>', "OFFSCREEN"),  # #8 후손 결합자
+    ('<style>span[class*="hide"]{opacity:0}</style><span class="xhide">바카라 추천 코드</span>', "TRANSPARENT"),                     # #8 속성 부분일치
+    ('<span style="display:inline-block;width:80px;overflow:hidden;text-indent:-300px">사설토토 첫충</span>', "OFFSCREEN"),           # #4
+    ('<div style="height:0;overflow:hidden">불법 카지노 바카라</div>', "OFFSCREEN"), ('<span style="font-size:0.05rem">사설토토</span>', "OFFSCREEN"),  # #5
+])
+def test_argon_round2_already_covered(html, code):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert code in {c for f in fs for c in f.official}, [(f.location, f.official) for f in fs]
+
+
+def test_spec_example_locations_reproduced():
+    """요강 붙임4 예시 4건과 같은 DOM 에서 우리 location 이 예시 문자열과 같은 요소를 가리키는지(문자열 자체도 f_001·f_003·f_004 와 동일)."""
+    html = ('<html><body><div class="notice-board"><p>공지</p><span class="visually-hidden" style="display:none">ㅋㅏㅈㅣㄴㅗ ㅂㅗㄴㅓㅅㅡ 코드 LUCKY7</span></div>'
+            '<div class="article-body"><p class="desc">정상 <span style="color:#fff">먹튀검증 안전놀이터 상담 텔레그램 @promo_777</span></p></div>'
+            '<div class="board-list"><table>' + "".join(f'<tr><td class="title"><a href="/v?id={i}">공지 {i}</a></td></tr>' for i in range(1, 7)) +
+            '<tr><td class="title"><a href="/v?id=7">ｍｅｇａ－ＢＥＴ 첫충 30％ 지급</a></td></tr></table></div></body></html>')
+    fs = analyze_page(Page(url="http://ex.go.kr/board/view?id=1024", html=html), "ex.go.kr")
+    locs = {c: f.location for f in fs for c in f.official}
+    assert locs["JAMO"] == "div.notice-board > span.visually-hidden" and locs["OFFSCREEN"] == "div.notice-board > span.visually-hidden"
+    assert locs["TRANSPARENT"] == "div.article-body > p.desc > span"
+    soup = BeautifulSoup(html, "lxml")
+    # f_002 는 예시가 'div.board-list > tr:nth-child(7) > td.title > a' (table 생략·nth-child). 우리 선택자가 같은 a 를 가리켜야 한다.
+    ours = soup.select(locs["HOMOGLYPH"])
+    theirs = soup.select("div.board-list tr:nth-child(7) > td.title > a")
+    assert len(ours) == 1 and ours == theirs
+    assert "tbody" not in locs["HOMOGLYPH"]   # 브라우저 DOM(tbody 삽입)과 파서 DOM 양쪽에서 해석되게 table 과 tr 사이는 자손 결합자
+    # f_004 iframe 접두어
+    fr = analyze_page(Page(url="http://ex.go.kr/widget/notice", html='<html><body><div class="wrap"><span class="hidden-link" style="display:none">무료 슬롯 체험 바로가기</span></div></body></html>',
+                           is_iframe=True, top_url="http://ex.go.kr/board/view?id=1180", frame_prefix='iframe[src="http://ex.go.kr/widget/notice"] >>> '), "ex.go.kr")
+    assert [f.location for f in fr if f.official] == ['iframe[src="http://ex.go.kr/widget/notice"] >>> div.wrap > span.hidden-link']
