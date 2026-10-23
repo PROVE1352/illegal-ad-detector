@@ -264,3 +264,29 @@ def test_admin_context_keeps_suspicious_link():
     html = '<p>불법 도박 단속 안내 <a href="http://kk8282.top">토토사이트 안전놀이터 바로가기</a></p>'
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
     assert any("SUSPICIOUS_TLD" in n or "suspicious_tld" in n for f in fs for n in f.extra_names), fs
+
+
+# ---------- AR3: 스크립트 디코딩 재분석 ----------
+def _cc(s: str) -> str:
+    return "String.fromCharCode(" + ",".join(str(ord(c)) for c in s) + ")"
+
+
+@pytest.mark.parametrize("script", [
+    "document.body.innerHTML+=" + _cc('<a href="http://casino-vip.top">온라인 카지노 바카라</a>') + ";",
+    'var h="\\x3c\\x61\\x20\\x68\\x72\\x65\\x66\\x3d\\x22http://slot-77.xyz\\x22\\x3e슬롯사이트 꽁머니\\x3c\\x2f\\x61\\x3e";document.write(h);',
+    'eval(unescape("%3Ca%20href%3D%22http%3A%2F%2Fbet-99.top%22%3E%ED%86%A0%ED%86%A0%EC%82%AC%EC%9D%B4%ED%8A%B8%3C%2Fa%3E"));',
+    'var s=atob("' + __import__("base64").b64encode(__import__("base64").b64encode('<a href="http://go-casino.top">토토사이트 추천</a>'.encode())).decode() + '");eval(atob(s));',  # base64 2겹
+    'var p=["htt","p://","kk8","282",".top","/토토사이트"].join("");location.href=p;',
+])
+def test_script_decoding_layers(script):
+    from iad.scripts import analyze_script
+    rules, extra = analyze_script(script, "ex.go.kr")
+    names = {r for r, _, _ in rules}
+    assert names & {"script.encoded", "script.base64", "script.document_write", "script.innerhtml", "script.js_redirect"}, rules
+    assert "토토" in extra or "카지노" in extra or "슬롯" in extra or "kk8282" in extra, extra
+
+
+def test_script_decoded_finding_has_keyword_and_link():
+    html = "<html><body><script>document.body.innerHTML+=" + _cc('<a href="http://casino-vip.top">온라인 카지노 바카라</a>') + ";</script></body></html>"
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=html), "ex.go.kr")
+    assert fs and "SCRIPT_DECODED" in fs[0].extra_names and fs[0].category == "도박" and any("casino-vip.top" in l for l in fs[0].links)

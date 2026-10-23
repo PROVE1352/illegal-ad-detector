@@ -21,7 +21,8 @@ src/
     keywords.py       키워드 사전(도박·성인·불법금융·기타), 화이트리스트 문맥, 행정 문맥(키워드 주변 ±100자 예방·단속·신고 등)
                       (.py 모듈 — 데이터 파일 불필요)
     links.py          링크 휴리스틱(의심 TLD, 숫자 도메인, 단축 URL, 텔레그램/오픈채팅, 앵커-도메인 불일치, 대량 외부링크)
-    scripts.py        document.write/innerHTML 링크 주입, eval·base64, meta refresh, JS 리다이렉트
+    scripts.py        document.write/innerHTML 링크 주입, eval, meta refresh, JS 리다이렉트,
+                      인코딩 디코딩(base64·fromCharCode·\x/\u 이스케이프·%XX·hex 문자열·배열 join, 최대 3겹) 후 키워드·링크 재분석
     official.py       요강 붙임4 스키마 result.json / result_extra.json 작성
     report.py         자체완결 HTML 리포트(필터·정렬·근거 펼치기) + CSV + JSON
     render.py         선택: playwright channel="msedge" 로 정적 DOM vs 렌더 DOM 차이(동적 주입)·요소 스크린샷
@@ -51,7 +52,7 @@ uv run pytest -q
   같은 객체를 기법별로 따로 만든다. 같은 (url, location, technique) 은 1건으로 합친다.
 - `result_extra.json` 은 technique `"ETC"` 고정, `extra_finding` 에 우리가 정한 유형 이름(HTML_COMMENT, NOSCRIPT,
   HIDDEN_IFRAME, HIDDEN_VISIBILITY_HIDDEN, SCRIPT_INJECTION, META_REFRESH, SUSPICIOUS_TLD, SHORTENER, MESSENGER,
-  ANCHOR_MISMATCH, MASS_EXTERNAL_LINKS, OBFUSCATION_INSERT, DYNAMIC_INJECTION …)+분류+위험도+점수를 적는다.
+  ANCHOR_MISMATCH, MASS_EXTERNAL_LINKS, OBFUSCATION_INSERT, DYNAMIC_INJECTION, SCRIPT_DECODED, HIDDEN_EXTERNAL_LINK …)+분류+위험도+점수를 적는다.
   예시에 없던 `is_violation` 도 필수 필드 표를 따라 넣는다. (url, location) 당 1건으로 합친다.
 - **location 규칙**: 태그.클래스 를 상위부터 ` > ` 로 연결, 클래스가 없으면 `tr:nth-of-type(7)` 처럼 순서 지정
   (같은 클래스 형제가 여럿이면 클래스에도 nth-of-type 을 붙여 유일하게 만든다). html/body 는 생략하되 선택자가
@@ -104,3 +105,5 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 - 렌더 비교·스크린샷은 Edge+playwright 가 있을 때만(선택). 동적 주입은 그때만 잡힌다.
 - 키워드 사전 기반이라 사전에 없는 신조어는 놓칠 수 있다. 이미지(배너) 안 문구는 보지 않는다.
 - 로그인·POST 폼 뒤 페이지, JS 로만 이동하는 게시판은 수집하지 못한다.
+- 외부 사이트로 나가는 배너 링크의 목적지(1-hop)는 열어 보지 않는다(평가 환경이 폐쇄망이면 타임아웃만 쌓이고, 대상 사이트 외
+  네트워크 접근을 하지 않는다는 원칙 때문). 외부 iframe 은 1단계 수집한다.

@@ -328,6 +328,8 @@ class PageAnalyzer:
                 f.add(rule, detail, w, "script")
                 f.techniques.append(rule.split(".", 1)[1])
             f.extra_names.append("SCRIPT_INJECTION")
+            if any(r in ("script.base64", "script.encoded") for r, _, _ in rules):
+                f.extra_names.append("SCRIPT_DECODED")
             inner = BeautifulSoup(extra, "lxml") if extra else None
             text_for_kw = (inner.get_text(" ") if inner else "") + " " + code
             cats, _ = self._add_keywords(f, text_for_kw, allow_whitelist=False)
