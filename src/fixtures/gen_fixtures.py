@@ -310,6 +310,18 @@ class Site:
                                (y4, "MESSENGER", "도박"), (y5, "OBFUSCATION_INSERT", "도박"), (y6, "MASS_EXTERNAL_LINKS", "기타")):
             self.label("post/post_culture.html", eid, "ETC", cat, extra=name)
 
+        # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
+        k1 = self.nid()
+        normal_body = "<p>시민 제안 공모를 안내합니다. 접수: 10/20~11/5</p>"
+        add("post/post_cloak.html", "시민 제안 공모 안내", normal_body, ["좋은 제안 많이 모이길"])
+        bot_extra = (f'<div id="{k1}" style="position:absolute;left:-9999px">'
+                     + " ".join(f'<a href="http://{w}.{tld}">{t}</a>' for w, t in (
+                         (("bet-k1", "토토사이트"), ("cas-k2", "카지노사이트"), ("slot-k3", "슬롯사이트"), ("bac-k4", "바카라"))
+                         if not v else (("mj-k1", "메이저놀이터"), ("ev-k2", "에볼루션카지노"), ("pb-k3", "파워볼"), ("hd-k4", "홀덤사이트"))))
+                     + "</div>")
+        self.files["post/post_cloak.html.bot"] = self.files["post/post_cloak.html"].replace("</body>", bot_extra + "</body>")
+        self.label("post/post_cloak.html", k1, "ETC", "도박", extra="CLOAKING_OFFSCREEN")
+
         # 리다이렉트 페이지(목록에서 링크)
         self.files["ext/px.html"] = '<!doctype html><html><head><meta charset="utf-8"></head><body><a href="http://777.' + tld + '">go</a></body></html>'
         r1 = self.nid()

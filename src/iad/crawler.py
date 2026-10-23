@@ -31,6 +31,7 @@ class CrawlConfig:
     time_budget_sec: float = 20 * 60     # 요강 타임아웃 30분 → 기본 20분에 중단
     max_html_bytes: int = 3_000_000
     allowed_hosts: tuple[str, ...] | None = None   # 설정 시 이 호스트들만 요청(하네스용 오프라인 가드)
+    cloak_pages: int = 40                  # 클로킹 점검(봇 UA·네이버 Referer 재요청)할 최상위 페이지 수(0=끄기), 페이지당 2요청
     fetch_css: bool = True                 # <link rel=stylesheet>(동일 사이트) 수집해 클래스 규칙 해석
     max_css_files: int = 40                # 사이트 전체에서 받을 고유 CSS 파일 수 상한
     max_css_bytes: int = 1_000_000

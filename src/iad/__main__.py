@@ -22,6 +22,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--robots", action="store_true", help="robots.txt 존중")
     p.add_argument("--no-external-iframe", action="store_true", help="외부 도메인 iframe 수집 안 함")
     p.add_argument("--render", action="store_true", help="playwright(msedge) 렌더 비교·스크린샷 시도")
+    p.add_argument("--cloak-pages", type=int, default=40, help="클로킹 점검(봇 UA·검색 Referer 재요청) 페이지 수, 0=끄기")
+    p.add_argument("--no-css", action="store_true", help="외부 CSS 파일 수집 안 함")
     p.add_argument("--quiet", action="store_true")
     return p
 
@@ -30,7 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     cfg = CrawlConfig(depth=args.depth, max_pages=args.max_pages, delay=args.delay, timeout=args.timeout,
                       respect_robots=args.robots, follow_external_iframes=not args.no_external_iframe,
-                      time_budget_sec=args.time_budget)
+                      time_budget_sec=args.time_budget, cloak_pages=args.cloak_pages, fetch_css=not args.no_css)
     log = (lambda m: None) if args.quiet else (lambda m: print(m, flush=True))
     res = scan(args.url, cfg, out_dir=Path(args.out) if args.out else None,
                result_dir=Path(args.result_dir) if args.result_dir else None, log=log, render=args.render)

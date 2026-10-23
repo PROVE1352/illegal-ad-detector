@@ -68,6 +68,12 @@ def scan(entry_url: str, config: CrawlConfig | None = None, out_dir: Path | None
     except Exception as e:
         log(f"크롤 중단: {e!r}")
         res.stopped_reason = f"오류: {e!r}"
+    if cfg.cloak_pages > 0 and not (stop_flag and stop_flag()):
+        try:
+            from .cloak import check_cloaking
+            res.findings.extend(check_cloaking(crawler, res.pages, res.findings, base_host, cfg.cloak_pages, log))
+        except Exception as e:
+            log(f"클로킹 점검 생략: {e!r}")
     if render:
         try:
             from .render import render_compare

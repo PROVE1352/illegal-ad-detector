@@ -43,12 +43,23 @@ OFFICIAL = ("HOMOGLYPH", "JAMO", "TRANSPARENT", "OFFSCREEN")
 
 
 class QuietHandler(SimpleHTTPRequestHandler):
+    """정적 서버. 클로킹 흉내: 같은 경로에 '.bot' 파일이 있고 요청이 검색엔진 봇 UA 또는 네이버 검색 Referer 면 그 파일을 준다."""
+
     def log_message(self, *a) -> None:  # noqa: D102
         pass
 
-    def guess_type(self, path):  # cp949 파일은 charset 헤더 없이 (meta 로 판정하게)
-        t = super().guess_type(path)
-        return t
+    def translate_path(self, path: str) -> str:
+        real = super().translate_path(path)
+        ua = self.headers.get("User-Agent", "")
+        ref = self.headers.get("Referer", "")
+        if (re.search(r"Yeti|Googlebot|bingbot", ua) or "search.naver.com" in ref) and Path(real + ".bot").is_file():
+            return real + ".bot"
+        return real
+
+    def guess_type(self, path):  # cp949 파일은 charset 헤더 없이 (meta 로 판정하게); .bot 변형은 HTML 로
+        if str(path).endswith(".bot"):
+            return "text/html"
+        return super().guess_type(path)
 
 
 def pick_port(preferred: int) -> int:
@@ -88,11 +99,13 @@ def load_soup(f: Path) -> BeautifulSoup:
     return _SOUPS[f]
 
 
-def resolve(url: str, location: str, root: Path) -> tuple[str | None, str | None, str]:
-    """(doc 상대경로, element_id, 상태). 상태: ok / 특정불가(n) / 파일없음 / 선택자오류"""
+def resolve(url: str, location: str, root: Path, bot: bool = False) -> tuple[str | None, str | None, str]:
+    """(doc 상대경로, element_id, 상태). 상태: ok / 특정불가(n) / 파일없음 / 선택자오류. bot=True 면 '.bot' 변형 문서로 해석."""
     f = url_to_file(url, root)
     if f is None:
         return None, None, "파일없음"
+    if bot and (f.parent / (f.name + ".bot")).is_file():
+        f = f.parent / (f.name + ".bot")
     parts = [s.strip() for s in location.split(" >>> ")]
     for seg in parts[:-1]:
         m = re.match(r'iframe\[src="([^"]+)"\]', seg)
@@ -120,7 +133,7 @@ def resolve(url: str, location: str, root: Path) -> tuple[str | None, str | None
     if len(els) != 1:
         return None, None, f"특정불가({len(els)})"
     el = els[0]
-    rel = str(f.relative_to(root)).replace("\\", "/")
+    rel = str(f.relative_to(root)).replace("\\", "/").removesuffix(".bot")
     _LAST_EL[0] = el
     return rel, el.get("id"), "ok"
 
@@ -200,7 +213,8 @@ def evaluate_set(name: str, labels: list[dict], decoys: list[str], root: Path, p
     etc_hit: set[tuple] = set()
     etc_fp: list[dict] = []
     for fnd in extra:
-        doc, eid, status = resolve(fnd["url"], fnd["location"], root)
+        cloak = "CLOAKING" in fnd.get("extra_finding", "")
+        doc, eid, status = resolve(fnd["url"], fnd["location"], root, bot=cloak)
         if status != "ok":
             etc_fp.append({**fnd, "reason": status})
             continue

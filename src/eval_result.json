@@ -1,17 +1,17 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 12:00:22",
+  "timestamp": "2026-10-23 12:03:08",
   "depth": 3,
   "max_pages": 300,
-  "port": 60702
+  "port": 62371
  },
  "results": [
   {
    "set": "dev",
-   "entry_url": "http://127.0.0.1:60702/dev/index.html",
-   "pages_crawled": 26,
-   "elapsed_sec": 0.16,
-   "tool_elapsed_sec": 0.154484,
+   "entry_url": "http://127.0.0.1:62371/dev/index.html",
+   "pages_crawled": 27,
+   "elapsed_sec": 0.19,
+   "tool_elapsed_sec": 0.18281,
    "official": {
     "gold": 33,
     "reported_units": 33,
@@ -47,22 +47,22 @@
     "unresolved": []
    },
    "extra": {
-    "gold": 16,
-    "reported": 16,
-    "hit": 16,
+    "gold": 17,
+    "reported": 17,
+    "hit": 17,
     "recall": 1.0,
     "false_positives": [],
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_cs8f4o4b"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_dz_fjfvi"
   },
   {
    "set": "holdout",
-   "entry_url": "http://127.0.0.1:60702/holdout/index.html",
-   "pages_crawled": 26,
-   "elapsed_sec": 0.09,
-   "tool_elapsed_sec": 0.088478,
+   "entry_url": "http://127.0.0.1:62371/holdout/index.html",
+   "pages_crawled": 27,
+   "elapsed_sec": 0.12,
+   "tool_elapsed_sec": 0.11931,
    "official": {
     "gold": 33,
     "reported_units": 33,
@@ -98,15 +98,15 @@
     "unresolved": []
    },
    "extra": {
-    "gold": 16,
-    "reported": 16,
-    "hit": 16,
+    "gold": 17,
+    "reported": 17,
+    "hit": 17,
     "recall": 1.0,
     "false_positives": [],
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_1evmbwt4"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_zwegnfpd"
   }
  ]
 }

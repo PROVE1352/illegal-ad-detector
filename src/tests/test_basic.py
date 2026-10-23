@@ -290,3 +290,46 @@ def test_script_decoded_finding_has_keyword_and_link():
     html = "<html><body><script>document.body.innerHTML+=" + _cc('<a href="http://casino-vip.top">온라인 카지노 바카라</a>') + ";</script></body></html>"
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=html), "ex.go.kr")
     assert fs and "SCRIPT_DECODED" in fs[0].extra_names and fs[0].category == "도박" and any("casino-vip.top" in l for l in fs[0].links)
+
+
+# ---------- AR1: 클로킹 ----------
+def test_cloaking_detects_bot_only_content_and_redirect():
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from iad.cloak import check_cloaking
+    from iad.crawler import Crawler, CrawlConfig
+
+    NORMAL = "<html><body><p>정상 공지</p></body></html>"
+    BOT = '<html><body><p>정상 공지</p><div style="display:none"><a href="http://bet-1.top">토토사이트</a> 안전놀이터</div></body></html>'
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):  # noqa: D102
+            pass
+
+        def do_GET(self):
+            bot = "Yeti" in self.headers.get("User-Agent", "") or "Googlebot" in self.headers.get("User-Agent", "")
+            if self.path == "/r.html" and bot:
+                self.send_response(302)
+                self.send_header("Location", "http://go-casino.top/")
+                self.end_headers()
+                return
+            body = (BOT if bot and self.path == "/a.html" else NORMAL).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_port}"
+    try:
+        c = Crawler(base + "/a.html", CrawlConfig(delay=0, allowed_hosts=("127.0.0.1",)))
+        import time
+        c.started = time.monotonic()
+        pages = [Page(url=base + "/a.html", html=NORMAL), Page(url=base + "/r.html", html=NORMAL, depth=1)]
+        fs = check_cloaking(c, pages, [], "127.0.0.1", 10, lambda m: None)
+    finally:
+        srv.shutdown()
+    names = {n for f in fs for n in f.extra_names}
+    assert "CLOAKING_OFFSCREEN" in names and "CLOAKING_REDIRECT" in names, names
+    assert all(not f.official for f in fs)   # 봇 전용 DOM 은 result.json 에 넣지 않는다

@@ -23,6 +23,8 @@ src/
     links.py          링크 휴리스틱(의심 TLD, 숫자 도메인, 단축 URL, 텔레그램/오픈채팅, 앵커-도메인 불일치, 대량 외부링크)
     scripts.py        document.write/innerHTML 링크 주입, eval, meta refresh, JS 리다이렉트,
                       인코딩 디코딩(base64·fromCharCode·\x/\u 이스케이프·%XX·hex 문자열·배열 join, 최대 3겹) 후 키워드·링크 재분석
+    cloak.py          클로킹 점검: 최상위 페이지(진입→디렉터리별 첫 페이지→나머지, 기본 40개)를 Yeti+네이버검색 Referer / Googlebot
+                      으로 다시 받아 일반 응답에 없는 요소·외부 링크·외부 리다이렉트를 ETC(CLOAKING_*) 로 보고(result.json 에는 안 넣음)
     official.py       요강 붙임4 스키마 result.json / result_extra.json 작성
     report.py         자체완결 HTML 리포트(필터·정렬·근거 펼치기) + CSV + JSON
     render.py         선택: playwright channel="msedge" 로 정적 DOM vs 렌더 DOM 차이(동적 주입)·요소 스크린샷
@@ -87,7 +89,8 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
   각 세트: 게시판 목록 2쪽 + 게시글 16 + 댓글 + 동일 도메인 iframe + 외부(localhost) iframe + EUC-KR 페이지 + 정상 문서 7종
   (도박중독 예방, 성인지 교육, 햇살론 대출 안내, 유해정보 차단 안내, 마약류 예방, 유관기관 링크 모음+sr-only, 성인병 안내+숨김 메뉴).
   외부 CSS 파일(@import 포함) 로 숨긴 게시글 1개(transform/음수 margin/rgba·hsla·#rrggbbaa 투명/근사색/숨긴 탭 상속 + 인쇄 전용·배경 이미지 하드 네거티브).
-  4종 라벨 33개(중첩 2요소 포함), ETC 라벨 16개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
+  클로킹 페이지 1개(같은 경로의 `.bot` 파일을 eval 서버가 봇 UA·네이버 Referer 요청에만 응답).
+  4종 라벨 33개(중첩 2요소 포함), ETC 라벨 17개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
 - 채점은 요강 방식 그대로: result.json 의 (url, location, technique) 단위로, location 을 DOM 에서 해석해 라벨 요소와 같은지 비교.
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.
@@ -97,7 +100,8 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 - hidden imports: `lxml._elementpath`, `bs4.builder._lxml`, `soupsieve`, `requests`, `charset_normalizer`, `idna`,
   `urllib3`, `tkinter`, `tkinter.ttk`. playwright 는 번들하지 않아도 되며(없으면 자동 생략), 넣으려면 `--extra render`.
 - 예: `pyinstaller --noconfirm --onefile --windowed --name iad run_gui.py --collect-submodules lxml --hidden-import bs4.builder._lxml`
-- 기본값(깊이 3, 300페이지, 0.3s 간격, 10s 타임아웃, 시간 예산 20분)으로 30분 타임아웃 안에 끝난다.
+- 기본값(깊이 3, 300페이지, 0.3s 간격, 10s 타임아웃, 시간 예산 20분, 클로킹 점검 40페이지×2요청)으로 30분 타임아웃 안에 끝난다.
+  크롤 시간 예산을 다 쓰면 클로킹 점검은 건너뛴다. `--cloak-pages 0`(GUI 체크 해제)으로 끌 수 있다.
 
 ## 알려진 한계
 - 정적 분석 중심. 외부 CSS 는 동일 사이트 것만 받고(타 도메인 CDN CSS 는 안 받음), 의사클래스·`calc()`·CSS 변수(`var()`)·
