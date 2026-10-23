@@ -38,8 +38,9 @@ RELEVANT_PROPS = {
     "text-indent", "transform", "translate", "margin", "margin-left", "margin-top", "margin-right", "margin-bottom",
     "clip", "clip-path", "color", "background", "background-color", "background-image", "width", "height", "overflow",
 }
-MAX_RULES = 4000
-NEAR_TOLERANCE = 10   # 글자색-배경색 채널별 차이가 이 값 이하면 '사실상 같은 색'(대비 매우 낮음)
+MAX_RULES = 20000
+NEAR_TOLERANCE = 10
+_SIMPLE_SEL = re.compile(r"^(?P<tag>[a-zA-Z][\w-]*)?(?P<cls>(?:\.[\w-]+)+)?(?P<id>#[\w-]+)?$")   # 글자색-배경색 채널별 차이가 이 값 이하면 '사실상 같은 색'(대비 매우 낮음)
 
 
 # ---------- 선언 파싱 ----------
@@ -245,8 +246,8 @@ def _walk_blocks(css: str, out: list[tuple[str, dict[str, str], dict[str, str]]]
         decls = _parse_decls(body)
         if not decls:
             continue
-        normal = {p: v for p, v, imp in decls if not imp and p in RELEVANT_PROPS}
-        important = {p: v for p, v, imp in decls if imp and p in RELEVANT_PROPS}
+        normal = {p: v for p, v, imp in decls if not imp and _may_hide(p, v)}
+        important = {p: v for p, v, imp in decls if imp and _may_hide(p, v)}
         if not normal and not important:
             continue
         for s in prelude.split(","):
@@ -257,6 +258,25 @@ def _walk_blocks(css: str, out: list[tuple[str, dict[str, str], dict[str, str]]]
                 # ::before/::after 등 가상 요소·:hover 등 상태 의사클래스는 정적 판정에서 제외. :not()/:nth-* 도 보수적으로 제외.
                 continue
             out.append((s, normal, important))
+
+
+def _may_hide(prop: str, val: str) -> bool:
+    """숨김 판정에 영향을 줄 수 있는 선언만 남긴다(대형 CSS 의 규칙 수를 줄여 요소 매핑 비용을 낮춘다)."""
+    if prop not in RELEVANT_PROPS:
+        return False
+    # 덮어쓰기(.a{display:none} .a.on{display:block})가 흔한 속성은 값과 무관하게 전부 남긴다(캐스케이드 정확도)
+    if prop in ("color", "background", "background-color", "background-image", "position", "overflow", "display",
+                "visibility", "opacity", "font-size", "font", "left", "top", "right", "bottom", "inset", "text-indent"):
+        return True
+    # margin/transform 은 규칙 수가 매우 많고 숨김 용도는 드물어 화면 밖(≤-500px) 값일 때만 남긴다
+    if prop in ("margin", "margin-left", "margin-top", "margin-right", "margin-bottom", "transform", "translate"):
+        return "-" in val and any(x <= -500 for x in _lengths(val))
+    if prop in ("clip", "clip-path"):
+        return True
+    if prop in ("width", "height"):
+        n = _px(val)
+        return n is not None and 0 <= n <= 1
+    return True
 
 
 @lru_cache(maxsize=256)
@@ -293,13 +313,50 @@ def apply_sheet(soup: BeautifulSoup, rules: list) -> dict[int, dict[str, str]]:
         sel, normal, important = rule[0], rule[1], (rule[2] if len(rule) > 2 else {})
         ordered.append((_specificity(sel), order, sel, normal, important))
     ordered.sort(key=lambda r: (r[0], r[1]))
+    if not ordered:
+        return applied
+    # 단순 선택자(tag / .a.b / #id / tag.a) 는 한 번 만든 색인으로 해석하고, 복합 선택자만 soup.select 로 푼다
+    by_class: dict[str, list[Tag]] = {}
+    by_id: dict[str, Tag] = {}
+    by_tag: dict[str, list[Tag]] = {}
+    all_tags: list[Tag] = []
+    for el in soup.find_all(True):
+        all_tags.append(el)
+        by_tag.setdefault(el.name, []).append(el)
+        for c in el.get("class") or []:
+            by_class.setdefault(c, []).append(el)
+        if el.get("id"):
+            by_id.setdefault(str(el.get("id")), el)
+
+    def resolve(sel: str) -> list[Tag]:
+        m = _SIMPLE_SEL.match(sel)
+        if not m:
+            try:
+                return soup.select(sel)
+            except Exception:
+                return []
+        tag, cls, eid = m.group("tag"), m.group("cls"), m.group("id")
+        if eid:
+            el = by_id.get(eid[1:])
+            cand = [el] if el is not None else []
+        elif cls:
+            classes = cls.split(".")[1:]
+            cand = min((by_class.get(c, []) for c in classes), key=len)
+        elif tag:
+            cand = by_tag.get(tag.lower(), [])
+        else:
+            cand = all_tags
+        if cls:
+            need = set(cls.split(".")[1:])
+            cand = [e for e in cand if need <= set(e.get("class") or [])]
+        if tag:
+            cand = [e for e in cand if e.name == tag.lower()]
+        return cand
+
     cache: dict[str, list[Tag]] = {}
     for _spec, _order, sel, normal, important in ordered:
         if sel not in cache:
-            try:
-                cache[sel] = soup.select(sel)
-            except Exception:
-                cache[sel] = []
+            cache[sel] = resolve(sel)
         for el in cache[sel]:
             d = applied.setdefault(id(el), {})
             d.update(normal)

@@ -415,3 +415,16 @@ def test_triage_enrichment_and_report_files(tmp_path):
     assert rows[0]["area"] and rows[0]["guide"] and rows[0]["fingerprint"]
     csv_head = (tmp_path / "report.csv").read_text(encoding="utf-8-sig").splitlines()[0]
     assert "조치요약" in csv_head and "지문(SHA-256)" in csv_head
+
+
+def test_large_stylesheet_is_fast_and_correct():
+    import time
+    css = "\n".join(f".c{i}{{padding:{i % 9}px;margin:{i % 5}px;font-weight:400;color:#333}}" for i in range(5000))
+    css += "\n.hide{display:none}\n.a.on{display:block}\n.a{display:none}\n"
+    html = '<html><body>' + "".join(f'<p class="c{i}">t</p>' for i in range(300)) + '<span class="hide">x</span><div class="a on">y</div></body></html>'
+    soup = BeautifulSoup(html, "lxml")
+    t0 = time.monotonic()
+    sheet = H.apply_sheet(soup, H.sheet_rules(soup, [css]))
+    assert time.monotonic() - t0 < 0.5
+    assert "display_none" in [t for t, _ in H.hidden_techniques(soup.find("span"), sheet)]
+    assert not H.hidden_techniques(soup.find("div"), sheet)
