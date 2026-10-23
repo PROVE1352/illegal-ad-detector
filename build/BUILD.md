@@ -113,9 +113,9 @@ Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/Illeg
 
 | 항목 | 값 |
 |---|---|
-| 실행 | GitHub Actions run 39891178157 (커밋 75ef411, 2026-10-23) |
-| 산출물 | `IllegalAdDetector-windows.zip` 66,523,803 bytes, 1,226 files (풀면 약 158 MB) |
-| 단위 테스트 | 25 passed |
+| 실행 | GitHub Actions run 39891832150 (커밋 678cab4, 2026-10-23) |
+| 산출물 | `IllegalAdDetector-windows.zip` 66,524,646 bytes, 1,226 files (풀면 약 158 MB) |
+| 단위 테스트 | 30 passed |
 | CLI 스모크 | PASS. `src/fixtures/dev` 25페이지를 5.2초에 탐지, result.json 25건(HOMOGLYPH, JAMO, OFFSCREEN, TRANSPARENT), result_extra.json 16건, 둘 다 BOM 없음 |
 | GUI 스모크 | PASS. mainloop 진입 후 5초 뒤 자동 종료, exit 0 |
 
