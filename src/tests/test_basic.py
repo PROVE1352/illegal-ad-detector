@@ -165,3 +165,73 @@ def test_euc_kr_decode():
         headers = {"content-type": "text/html"}
     txt, enc = decode_html(R())
     assert "고수익알바" in txt and enc == "cp949"
+
+
+# ---------- G0: 외부 CSS·캐스케이드·새 offscreen/투명 패턴 ----------
+@pytest.mark.parametrize("style,tech", [
+    ("position:absolute;transform:translateX(-9999px)", "offscreen"), ("transform:translate(-50%, -12000px)", "offscreen"),
+    ("position:relative;margin-left:-9999px", "offscreen"), ("margin:0 0 0 -9999px", "offscreen"),
+    ("position:fixed;inset:-9999px auto auto 0", "offscreen"), ("text-indent:-100em", "offscreen"),
+    ("color:rgba(0,0,0,0)", "color_match"), ("color:rgba(255, 255, 255, 0.03)", "color_match"),
+    ("color:hsla(0,0%,100%,1)", "color_match"), ("color:#00000000", "color_match"), ("color:#fdfdfd", "color_match"),
+    ("color:rgb(255 255 255 / 0)", "color_match"), ("opacity:0%", "opacity_zero"), ("font:0px/1 sans-serif", "font_size_zero"),
+])
+def test_hidden_new_patterns(style, tech):
+    soup = BeautifulSoup(f'<html><body><span style="{style}">x</span></body></html>', "lxml")
+    assert tech in [t for t, _ in H.hidden_techniques(soup.find("span"), {})]
+
+
+@pytest.mark.parametrize("style", [
+    "color:#999", "color:#f0f0f0", "transform:translate(-50%,-50%)", "margin-left:-20px", "left:-9999px",  # position 없음
+    "text-indent:-50%", "opacity:0.5", "font-size:1.2px",
+])
+def test_hidden_negative_patterns(style):
+    soup = BeautifulSoup(f'<html><body><span style="{style}">x</span></body></html>', "lxml")
+    assert not H.hidden_techniques(soup.find("span"), {})
+
+
+def test_background_image_unknown_and_bgcolor_attr():
+    html = ('<html><body><div style="background:url(dark.png) no-repeat"><span style="color:#fff">a</span></div>'
+            '<table bgcolor="#000"><tr><td><span style="color:#000">b</span></td></tr></table>'
+            '<div style="background:#000 url(x.png)"><span style="color:#000">c</span></div></body></html>')
+    soup = BeautifulSoup(html, "lxml")
+    spans = soup.find_all("span")
+    assert not H.hidden_techniques(spans[0], {})          # 배경 이미지 → 색 비교 불가 → 보고 안 함
+    assert "color_match" in [t for t, _ in H.hidden_techniques(spans[1], {})]
+    assert "color_match" in [t for t, _ in H.hidden_techniques(spans[2], {})]
+
+
+def test_sheet_cascade_media_and_external_css():
+    css = ("@media print{.np{display:none}} .a{display:none} .a.on{display:block} #x{display:none !important}"
+           ".b{color:#fff} div.b{color:#000} @font-face{font-family:x;src:url(a.woff)} .c{left:-9999px;position:absolute}")
+    html = ('<html><head><style>.c{position:static}</style></head><body><p class="np">p</p><div class="a on">a</div>'
+            '<div id="x" style="display:block">x</div><div class="b">b</div><span class="c">c</span></body></html>')
+    soup = BeautifulSoup(html, "lxml")
+    sheet = H.apply_sheet(soup, H.sheet_rules(soup, [css]))
+    assert not H.hidden_techniques(soup.find("p"), sheet)                                  # print 전용 무시
+    assert not H.hidden_techniques(soup.find("div", class_="a"), sheet)                    # 명시도 .a.on > .a
+    assert "display_none" in [t for t, _ in H.hidden_techniques(soup.find(id="x"), sheet)]  # !important > 인라인
+    assert not H.hidden_techniques(soup.find("div", class_="b"), sheet)                    # div.b(#000) > .b(#fff)
+    assert not H.hidden_techniques(soup.find("span"), sheet)                               # 문서 <style> 이 외부 CSS 뒤 → static
+
+
+@pytest.mark.parametrize("html,code", [
+    ('<div class="notice-board"><span class="visually-hidden" style="display:none">ㅋㅏㅈㅣㄴㅗ ㅂㅗㄴㅓㅅㅡ 코드 LUCKY7</span></div>', "JAMO"),
+    ('<div class="notice-board"><span class="visually-hidden" style="display:none">ㅋㅏㅈㅣㄴㅗ ㅂㅗㄴㅓㅅㅡ 코드 LUCKY7</span></div>', "OFFSCREEN"),
+    ('<div class="board-list"><table><tr><td class="title"><a href="#">ｍｅｇａ－ＢＥＴ 첫충 30％ 지급</a></td></tr></table></div>', "HOMOGLYPH"),
+    ('<div class="article-body"><p class="desc"><span style="color:#fff">먹튀검증 안전놀이터 상담 텔레그램 @promo_777</span></p></div>', "TRANSPARENT"),
+    ('<div class="wrap"><span class="hidden-link" style="position:absolute;left:-9999px">무료 슬롯 체험 바로가기</span></div>', "OFFSCREEN"),
+    ('<div class="wrap"><span class="hidden-link" style="font-size:0">무료 슬롯 체험 바로가기</span></div>', "OFFSCREEN"),
+])
+def test_spec_examples(html, code):
+    """요강 붙임4 예시 evidence_text 를 그대로 넣었을 때 해당 코드가 나와야 한다."""
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert code in {c for f in fs for c in f.official}, [(f.location, f.official) for f in fs]
+
+
+def test_crawler_collects_same_site_css(tmp_path):
+    from iad.crawler import Crawler, CrawlConfig
+    c = Crawler("http://ex.go.kr/a.html", CrawlConfig(allowed_hosts=()))   # 네트워크 차단
+    c.css_cache["http://ex.go.kr/s.css"] = ".h{display:none}"
+    soup = BeautifulSoup('<html><head><link rel="stylesheet" href="/s.css"><link rel="stylesheet" href="http://cdn.x.com/b.css"></head></html>', "lxml")
+    assert c.stylesheets(Page(url="http://ex.go.kr/a.html", html=""), soup) == [".h{display:none}"]

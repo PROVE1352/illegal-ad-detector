@@ -1,0 +1,12 @@
+/* 사이트 공통 */
+@import url("theme.css");
+.wrap-dark{background:#222;color:#fff;padding:8px}
+.skip{position:absolute;left:0;top:0;transform:translateX(-12000px)}
+.push{position:relative;margin-top:-8000px}
+.ghost{color:hsla(0, 0%, 100%, 0)}
+.faint{color:#fcfcfc}
+.alpha{color:#ffffff05}
+.tabpane{display:none}
+.tabpane.active{display:block}
+@media print{.no-print{display:none}}
+.hero{background:url(bg.png) no-repeat;color:#fff;padding:20px}

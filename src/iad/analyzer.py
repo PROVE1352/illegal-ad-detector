@@ -114,7 +114,7 @@ class PageAnalyzer:
         self.page = page
         self.base_host = base_host
         self.soup = BeautifulSoup(page.html or "", "lxml")
-        self.sheet = H.apply_sheet(self.soup, H.sheet_rules(self.soup))
+        self.sheet = H.apply_sheet(self.soup, H.sheet_rules(self.soup, page.css_texts))
         self.findings: list[Finding] = []
         self.covered: set[int] = set()
         title = self.soup.title.get_text(" ") if self.soup.title else ""
@@ -391,7 +391,9 @@ class PageAnalyzer:
         # 요강 4종 판정: 숨김 기법이 4종에 해당하고 불법 키워드가 충분히 강할 때만.
         # 숨긴 탭/아코디언 안의 정상 안내문(카지노 관광 안내 등)은 화이트리스트 문맥이 강하면 제외.
         wl_total = sum(w for _, w in match_whitelist(text))
-        if cats and max_w >= OFFICIAL_MIN_KEYWORD and not (wl_total <= -3 and max_w < 3):
+        obfuscated = "obfuscation" in f.techniques   # 숨김 + 난독화가 겹치면 약한 키워드(카지노 1.5)도 고의성이 충분
+        strong = max_w >= OFFICIAL_MIN_KEYWORD or (obfuscated and max_w >= 1.0)
+        if cats and strong and not (wl_total <= -3 and max_w < 3):
             for tech, _ in techs:
                 code = OFFICIAL_MAP.get(tech)
                 if code and code not in f.official:

@@ -18,6 +18,7 @@ class Page:
     error: str | None = None
     top_url: str | None = None      # iframe 안 페이지면 최상위(부모) 페이지 URL
     frame_prefix: str = ""          # 'iframe[src="..."] >>> ' 누적 접두어
+    css_texts: list[str] = field(default_factory=list)   # 외부 스타일시트(<link rel=stylesheet>, @import) 본문
 
     @property
     def report_url(self) -> str:

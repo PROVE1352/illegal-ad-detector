@@ -12,9 +12,11 @@ src/
     __main__.py       CLI  python -m iad --url URL [--depth 3 --max-pages 300 --delay 0.3 --out DIR --result-dir DIR --render]
     scan.py           파이프라인: 크롤 → 분석 → result.json/result_extra.json → report.html/csv/json
     crawler.py        동일 도메인 BFS, 페이지네이션, iframe(동일 도메인=추적, 외부=1단계 수집+플래그), robots 옵션,
-                      EUC-KR 처리, 시간 예산(기본 20분)·최대 페이지(기본 300) 상한
+                      EUC-KR 처리, 시간 예산(기본 20분)·최대 페이지(기본 300) 상한,
+                      동일 사이트 외부 CSS(<link rel=stylesheet>, @import 1단계) 수집(URL 당 1회 캐시, 최대 40개)
     analyzer.py       페이지 분석기. 요강 location 규칙, 4종 technique 판정, 추가 유형(ETC)
-    hidden.py         숨김 기법: inline style / <style> 단순 규칙 / 속성 / 크기 / 글자색=배경색 등
+    hidden.py         숨김 기법: inline style / <style>·외부 CSS 규칙(명시도·!important 캐스케이드, @media print 제외) /
+                      속성 / 크기 / 글자색≈배경색(조상 배경·bgcolor, 배경 이미지면 판정 보류) / transform·margin·text-indent offscreen
     normalize.py      난독화 정규화(자모 합성, NFKC 전각, 유사문자, 제로폭·특수문자·이모지 제거) — 레벨별 함수
     keywords.py       키워드 사전(도박·성인·불법금융·기타)과 화이트리스트 문맥 (.py 모듈 — 데이터 파일 불필요)
     links.py          링크 휴리스틱(의심 TLD, 숫자 도메인, 단축 URL, 텔레그램/오픈채팅, 앵커-도메인 불일치, 대량 외부링크)
@@ -59,20 +61,26 @@ uv run pytest -q
 ### 4종 판정 기준(오탐이 정확도 감점이라 보수적으로)
 | 코드 | 조건 |
 |---|---|
-| OFFSCREEN | display:none / font-size 0~1px / position·text-indent 로 화면 밖(≤-500px) 인 요소 **+** 요소 텍스트에 가중치 1.5 이상 키워드 |
-| TRANSPARENT | color 가 배경색과 같음(가장 가까운 배경, 기본 흰색) / color:transparent / opacity ≤0.05 **+** 위와 같은 키워드 조건 |
+| OFFSCREEN | display:none / font-size 0~1px / position(+left·top·right·bottom·inset)·text-indent·transform translate·음수 margin 으로 화면 밖(≤-500px) 인 요소 **+** 요소 텍스트에 가중치 2.0 이상 키워드(난독화와 겹치면 1.0 이상) |
+| TRANSPARENT | color 가 배경색과 같거나 채널별 차이 ≤10(가장 가까운 조상 배경색·bgcolor, 기본 흰색; 배경 이미지·그라데이션만 있으면 판정 안 함) / color:transparent·알파 ≤0.05(rgba/hsla/#rrggbbaa) / opacity ≤0.05 **+** 위와 같은 키워드 조건 |
 | HOMOGLYPH | 전각·키릴·그리스·숫자 유사문자를 치환해야 키워드가 맞거나, 평문 키워드(≥2)와 전각/키릴 문자가 같은 말단 요소에 공존 |
 | JAMO | 분리 자모를 합성해야 키워드가 맞거나, 평문 키워드(≥2)와 합성 가능한 자모가 같은 말단 요소에 공존 |
 
 visibility:hidden, hidden 속성, 1×1 크기/clip, marquee, noscript, HTML 주석, 숨김 + 링크만(키워드 없음) 등 요강 정의가
 불명확한 것은 result.json 에 넣지 않고 result_extra.json 으로 보낸다. 요소 위치는 숨김 스타일이 걸린 요소(4종 중
-TRANSPARENT/OFFSCREEN), 난독화 텍스트를 품은 가장 안쪽 요소(HOMOGLYPH/JAMO)다.
+TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으면 그 부모), 난독화 텍스트를 품은 가장 안쪽 요소(HOMOGLYPH/JAMO)다.
+
+스타일 해석 규칙: 인라인 style, 문서 `<style>`, 동일 사이트 외부 CSS(`<link rel=stylesheet>`·`@import` 1단계)를 모두 읽고
+(!important, 명시도, 선언 순서) 순으로 캐스케이드한다. 의사클래스(:hover 등) 선택자와 `@media print` 블록은 적용하지 않는다.
+외부 CSS 는 숨김 판정에 쓰는 속성(display/visibility/opacity/font-size/position/offset/text-indent/transform/margin/clip/color/background/크기)
+만 추려 요소에 매핑하므로 대형 사이트 CSS 에서도 페이지당 수십 ms 수준이다.
 
 ## 하네스 (`eval.py`)
 - `fixtures/gen_fixtures.py` 가 단일 소스에서 dev/holdout 두 사이트와 `labels.json` 을 만든다(요소 id 는 중립, 탐지기는 id 를 읽지 않음).
   각 세트: 게시판 목록 2쪽 + 게시글 16 + 댓글 + 동일 도메인 iframe + 외부(localhost) iframe + EUC-KR 페이지 + 정상 문서 7종
   (도박중독 예방, 성인지 교육, 햇살론 대출 안내, 유해정보 차단 안내, 마약류 예방, 유관기관 링크 모음+sr-only, 성인병 안내+숨김 메뉴).
-  4종 라벨 26개(중첩 2요소 포함), ETC 라벨 16개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
+  외부 CSS 파일(@import 포함) 로 숨긴 게시글 1개(transform/음수 margin/rgba·hsla·#rrggbbaa 투명/근사색/숨긴 탭 상속 + 인쇄 전용·배경 이미지 하드 네거티브).
+  4종 라벨 33개(중첩 2요소 포함), ETC 라벨 16개. holdout 은 문구·TLD·CSS 수법(top:-5000px, rgb 배경 등)을 바꿨고 규칙 튜닝에 쓰지 않는다.
 - 채점은 요강 방식 그대로: result.json 의 (url, location, technique) 단위로, location 을 DOM 에서 해석해 라벨 요소와 같은지 비교.
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.
@@ -85,7 +93,8 @@ TRANSPARENT/OFFSCREEN), 난독화 텍스트를 품은 가장 안쪽 요소(HOMOG
 - 기본값(깊이 3, 300페이지, 0.3s 간격, 10s 타임아웃, 시간 예산 20분)으로 30분 타임아웃 안에 끝난다.
 
 ## 알려진 한계
-- 정적 분석 중심. CSS 상속·계산 스타일(외부 CSS 파일, 미디어쿼리 우선순위)은 단순 규칙만 해석한다.
+- 정적 분석 중심. 외부 CSS 는 동일 사이트 것만 받고(타 도메인 CDN CSS 는 안 받음), 의사클래스·`calc()`·CSS 변수(`var()`)·
+  미디어쿼리 조건(화면 크기)은 해석하지 않는다. JS 로 뒤늦게 붙는 클래스/스타일은 `--render` 일 때만 보인다.
 - 렌더 비교·스크린샷은 Edge+playwright 가 있을 때만(선택). 동적 주입은 그때만 잡힌다.
 - 키워드 사전 기반이라 사전에 없는 신조어는 놓칠 수 있다. 이미지(배너) 안 문구는 보지 않는다.
 - 로그인·POST 폼 뒤 페이지, JS 로만 이동하는 게시판은 수집하지 못한다.

@@ -31,6 +31,9 @@ class CrawlConfig:
     time_budget_sec: float = 20 * 60     # 요강 타임아웃 30분 → 기본 20분에 중단
     max_html_bytes: int = 3_000_000
     allowed_hosts: tuple[str, ...] | None = None   # 설정 시 이 호스트들만 요청(하네스용 오프라인 가드)
+    fetch_css: bool = True                 # <link rel=stylesheet>(동일 사이트) 수집해 클래스 규칙 해석
+    max_css_files: int = 40                # 사이트 전체에서 받을 고유 CSS 파일 수 상한
+    max_css_bytes: int = 1_000_000
 
 
 def normalize_url(url: str) -> str:
@@ -82,6 +85,7 @@ class Crawler:
         self.started = 0.0
         self.stopped_reason = ""
         self._stop = False
+        self.css_cache: dict[str, str | None] = {}   # 스타일시트 URL → 본문(실패면 None)
         self.robots: robotparser.RobotFileParser | None = None
         if self.cfg.respect_robots:
             self.robots = robotparser.RobotFileParser()
@@ -140,6 +144,62 @@ class Crawler:
             self.pages_fetched += 1
         return page
 
+    # ---------- 외부 CSS ----------
+    _IMPORT = re.compile(r"@import\s+(?:url\()?\s*[\"']?([^\"')\s;]+)[\"']?\s*\)?[^;]*;", re.I)
+
+    def _fetch_css(self, url: str) -> str | None:
+        if url in self.css_cache:
+            return self.css_cache[url]
+        if len([v for v in self.css_cache.values() if v is not None]) >= self.cfg.max_css_files:
+            return None
+        if self.cfg.allowed_hosts is not None and host_of(url) not in self.cfg.allowed_hosts:
+            return None
+        text: str | None = None
+        try:
+            resp = self.session.get(url, timeout=self.cfg.timeout, allow_redirects=True, stream=True)
+            if resp.status_code == 200:
+                raw = resp.raw.read(self.cfg.max_css_bytes, decode_content=True)
+                enc = "utf-8"
+                m = re.search(r"charset=([\w\-]+)", resp.headers.get("content-type", ""), re.I)
+                if m:
+                    enc = m.group(1)
+                try:
+                    text = raw.decode(enc)
+                except (UnicodeDecodeError, LookupError):
+                    text = raw.decode("utf-8", errors="replace")
+            resp.close()
+        except requests.RequestException:
+            text = None
+        self.css_cache[url] = text
+        return text
+
+    def stylesheets(self, page: Page, soup: BeautifulSoup) -> list[str]:
+        """문서의 <link rel=stylesheet>(동일 사이트만) + 그 안의 @import(1단계) 본문을 문서 순서대로."""
+        if not self.cfg.fetch_css:
+            return []
+        out: list[str] = []
+        for ln in soup.find_all("link", href=True):
+            rel = " ".join(ln.get("rel") or []).lower() if isinstance(ln.get("rel"), list) else str(ln.get("rel", "")).lower()
+            if "stylesheet" not in rel:
+                continue
+            media = str(ln.get("media", "")).lower()
+            if media and "print" in media and "screen" not in media and "all" not in media:
+                continue
+            href = urljoin(page.url, str(ln["href"]).strip())
+            if not href.startswith(("http://", "https://")) or not is_same_site(href, self.base_host):
+                continue
+            css = self._fetch_css(href)
+            if not css:
+                continue
+            for m in self._IMPORT.finditer(css[:20000]):
+                sub = urljoin(href, m.group(1))
+                if is_same_site(sub, self.base_host):
+                    sub_css = self._fetch_css(sub)
+                    if sub_css:
+                        out.append(sub_css)
+            out.append(css)
+        return out
+
     def extract_links(self, page: Page, soup: BeautifulSoup) -> Iterator[str]:
         for a in soup.find_all(["a", "area"], href=True):
             href = str(a["href"]).strip()
@@ -175,10 +235,12 @@ class Crawler:
             page = self.fetch(url, depth, parent)
             self.log(f"[{self.pages_fetched}/{self.cfg.max_pages}] d{depth} {page.status} {url}" +
                      (f"  ({page.error})" if page.error else ""))
+            soup = BeautifulSoup(page.html, "lxml") if (page.html and not page.error) else None
+            if soup is not None:
+                page.css_texts = self.stylesheets(page, soup)   # 분석(yield 뒤)이 외부 CSS 를 쓰도록 먼저 수집
             yield page
-            if page.error or not page.html:
+            if soup is None:
                 continue
-            soup = BeautifulSoup(page.html, "lxml")
             # iframe: 같은 도메인은 수집+링크 추적, 외부는 1단계 수집만(플래그)
             yield from self._crawl_frames(page, soup, depth, queue)
             if depth >= self.cfg.depth:
@@ -217,10 +279,12 @@ class Crawler:
             fp = self.fetch(abs_src, depth + 1, parent=page.url, is_iframe=True, external=not same,
                             top_url=page.report_url, frame_prefix=page.frame_prefix + seg)
             self.log(f"[{self.pages_fetched}/{self.cfg.max_pages}] iframe{' (외부)' if not same else ''} {fp.status} {abs_src}")
+            fsoup = BeautifulSoup(fp.html, "lxml") if (fp.html and not fp.error) else None
+            if fsoup is not None and same:
+                fp.css_texts = self.stylesheets(fp, fsoup)
             yield fp
-            if fp.error or not fp.html:
+            if fsoup is None:
                 continue
-            fsoup = BeautifulSoup(fp.html, "lxml")
             yield from self._crawl_frames(fp, fsoup, depth + 1, queue, nest + 1)
             if same and depth + 1 < self.cfg.depth:
                 for link in self.extract_links(fp, fsoup):

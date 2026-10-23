@@ -203,6 +203,48 @@ class Site:
         self.label("post/post_parking.html", c2, "TRANSPARENT", "도박")
         self.label("post/post_parking.html", c2, "HOMOGLYPH", "도박")
 
+        # 외부 CSS 파일(클래스 규칙)·상속·transform/margin offscreen·rgba/hsla/8자리 hex 투명·근사색 + 하드 네거티브
+        g1, g2, g3, g4, g5, g6, g7 = (self.nid() for _ in range(7))
+        near = "#fdfdfd" if not v else "#fcfcfc"
+        site_css = f"""/* 사이트 공통 */
+@import url("theme.css");
+.wrap-dark{{background:#222;color:#fff;padding:8px}}
+.skip{{position:absolute;left:0;top:0;transform:translateX({"-9999px" if not v else "-12000px"})}}
+.push{{position:relative;{"margin-left:-9999px" if not v else "margin-top:-8000px"}}}
+.ghost{{color:{"rgba(0,0,0,0)" if not v else "hsla(0, 0%, 100%, 0)"}}}
+.faint{{color:{near}}}
+.alpha{{color:{"#00000000" if not v else "#ffffff05"}}}
+.tabpane{{display:none}}
+.tabpane.active{{display:block}}
+@media print{{.no-print{{display:none}}}}
+.hero{{background:url(bg.png) no-repeat;color:#fff;padding:20px}}
+"""
+        theme_css = ".theme-hide{" + ("position:absolute;top:-6000px" if not v else "font-size:0") + "}\n"
+        self.files["css/site.css"] = site_css
+        self.files["css/theme.css"] = theme_css
+        add("post/post_notice_css.html", "정보화 교육 수강생 모집",
+            f'<p>하반기 정보화 교육(스마트폰 활용) 수강생을 모집합니다.</p>'
+            f'<p class="no-print">불법 토토사이트 광고 신고는 1336, 인쇄 시 이 안내는 제외됩니다.</p>'          # 인쇄 전용 display:none → 4종 아님
+            f'<div class="hero"><span>{"토토사이트 불법광고 신고 안내" if not v else "카지노사이트 불법광고 신고 안내"} (배경 이미지 위 흰 글씨)</span></div>'   # 배경 이미지 → TRANSPARENT 아님
+            f'<div class="wrap-dark">야간 교육 안내: 매주 화·목 19시 <span style="color:#fff">문의 정보화담당관</span></div>'
+            f'<a class="skip" id="{g1}" href="https://{"kk-bet" if not v else "zz-bet"}.{"top" if not v else "xyz"}">{"안전놀이터 먹튀검증 토토사이트" if not v else "메이저놀이터 검증업체 사설토토"}</a>'
+            f'<p class="push" id="{g2}">{"바카라 온라인카지노 첫충 이벤트" if not v else "라이브카지노 슬롯사이트 매충 이벤트"}</p>'
+            f'<span class="ghost" id="{g3}">{"출장안마 출장마사지 24시" if not v else "조건만남 애인대행 24시"}</span>'
+            f'<span class="faint" id="{g4}">{"무직자대출 당일대출 100% 승인" if not v else "신불자대출 일수대출 즉시 승인"}</span>'
+            f'<div class="alpha" id="{g5}">{"카드깡 소액결제현금화" if not v else "정보이용료현금화 상품권현금화"}</div>'
+            f'<div class="tabpane"><p>교육 장소: 시청 3층 전산교육장</p></div>'
+            f'<div class="tabpane active"><p>준비물: 본인 스마트폰</p></div>'
+            f'<div class="tabpane" id="{g6}"><p>{"꽁머니 가입머니 토토사이트 추천" if not v else "입플 첫충 메이저사이트 추천"}</p></div>'   # 숨긴 탭 안: 부모 display:none 상속
+            f'<span class="theme-hide" id="{g7}">{"무료 슬롯 체험 바로가기" if not v else "무료 바카라 체험 카지노 보너스"}</span>',
+            ["감사합니다"], head='<link rel="stylesheet" href="../css/site.css">')
+        self.label("post/post_notice_css.html", g1, "OFFSCREEN", "도박")
+        self.label("post/post_notice_css.html", g2, "OFFSCREEN", "도박")
+        self.label("post/post_notice_css.html", g3, "TRANSPARENT", "성인")
+        self.label("post/post_notice_css.html", g4, "TRANSPARENT", "불법금융")
+        self.label("post/post_notice_css.html", g5, "TRANSPARENT", "불법금융")
+        self.label("post/post_notice_css.html", g7, "OFFSCREEN", "도박")
+        self.label("post/post_notice_css.html", g6, "OFFSCREEN", "도박", note="부모 display:none(외부 CSS 클래스) 상속")
+
         # iframe(같은 도메인) 안 OFFSCREEN + 외부 iframe 안 TRANSPARENT
         w1 = self.nid()
         self.files["widget/notice.html"] = f"""<!doctype html><html><head><meta charset="utf-8"><title>위젯</title></head><body>
