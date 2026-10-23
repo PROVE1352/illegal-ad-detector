@@ -1,0 +1,2 @@
+# fixtures 는 바이트 그대로(autocrlf 로 HTML/CSS 줄바꿈이 CRLF 로 바뀌면 실사이트 세트 분석 결과·크기가 달라진다)
+fixtures/** -text

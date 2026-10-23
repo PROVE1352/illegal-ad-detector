@@ -133,7 +133,7 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
   정확도 = 정탐/전체 검출. 소요시간·기법별 재현율·오탐·미탐 목록을 `EVAL_RESULT.md`, `eval_result.json` 에 남긴다.
 - 하네스는 `allowed_hosts` 오프라인 가드로 127.0.0.1/localhost 외에는 요청하지 않는다.
 - **실사이트 정상 세트** `fixtures/realworld/`(행안부 게시판 10쪽 + 외부 CSS 9개, 공개 페이지를 1초 간격으로 1회 수집, manifest.json):
-  오프라인으로 분석해 4종 0건 · ETC ≤9 · 쪽당 CPU ≤0.5s 를 통과 조건으로 EVAL_RESULT.md 에 PASS/FAIL 을 적는다(정상 공공 사이트 잡음 회귀 방지).
+  오프라인으로 분석해 4종 0건 · ETC ≤9 · 쪽당 CPU ≤1.0s(맥 실측 0.22s, Windows CI 러너 편차 감안) 를 통과 조건으로 EVAL_RESULT.md 에 PASS/FAIL 을 적는다(정상 공공 사이트 잡음 회귀 방지).
 
 실사이트 잡음 억제 규칙(P0-3): 폼 컨트롤(input/select/textarea/button…)은 텍스트 광고가 아니므로 4종 대상에서 제외(ETC 만).
 숨긴 메뉴의 외부 링크는 비신뢰 외부 링크가 3개 이상이거나 링크의 절반 이상일 때만 HIDDEN_EXTERNAL_LINK. HTML 주석은 에디터 메타데이터

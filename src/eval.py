@@ -211,7 +211,7 @@ def evaluate_set(name: str, labels: list[dict], decoys: list[str], root: Path, p
 
 REALWORLD = HERE / "fixtures" / "realworld"
 RW_MAX_ETC = 9          # 실사이트 정상 세트: ETC 는 한 자릿수
-RW_MAX_CPU_PER_PAGE = 0.5
+RW_MAX_CPU_PER_PAGE = 1.0   # 맥 M시리즈 실측 0.22s, Windows CI 러너 편차를 감안해 쪽당 1.0s(실측값은 EVAL_RESULT 에 기록)
 
 
 def evaluate_realworld() -> dict | None:
@@ -241,8 +241,18 @@ def evaluate_realworld() -> dict | None:
                 extra.append({**row, "extra_finding": "+".join(f.extra_names)})
     n = max(len(man["pages"]), 1)
     passed = not official and len(extra) <= RW_MAX_ETC and cpu / n <= RW_MAX_CPU_PER_PAGE
+    failed = [c for c, ok in (("official_fp=0", not official), (f"etc<={RW_MAX_ETC}", len(extra) <= RW_MAX_ETC),
+                              (f"cpu/page<={RW_MAX_CPU_PER_PAGE}", cpu / n <= RW_MAX_CPU_PER_PAGE)) if not ok]
     return {"set": "realworld", "entry_url": man["entry_url"], "pages": len(man["pages"]), "official_fp": official, "extra": extra,
-            "cpu_per_page": round(cpu / n, 3), "pass": passed}
+            "etc_count": len(extra), "cpu_per_page": round(cpu / n, 3), "cpu_total": round(cpu, 2), "pass": passed, "failed": failed}
+
+
+def realworld_summary(rw: dict) -> str:
+    """실패 원인을 한눈에: 어떤 조건이 깨졌는지, ETC 상위 5개, 쪽당 CPU."""
+    top = "; ".join(f"{e['extra_finding']} @ {e['location'][-60:]}" for e in rw["extra"][:5]) or "-"
+    fp = "; ".join(f"{e['technique']} @ {e['location'][-60:]}" for e in rw["official_fp"][:5]) or "-"
+    return (f"pass={rw['pass']} failed={rw['failed']} official_fp={len(rw['official_fp'])} [{fp}] "
+            f"etc_count={rw['etc_count']} (max {RW_MAX_ETC}) top5=[{top}] cpu_per_page={rw['cpu_per_page']}s (max {RW_MAX_CPU_PER_PAGE}, total {rw['cpu_total']}s)")
 
 
 def md_report(results: list[dict], meta: dict) -> str:
@@ -267,7 +277,7 @@ def md_report(results: list[dict], meta: dict) -> str:
     if rw:
         L += ["", "## 실사이트 정상 세트 (fixtures/realworld, 오프라인)", "",
               f"- 출처: {rw['entry_url']} ({rw['pages']}쪽, 1회 수집) · 통과 조건: 4종 0건 · ETC ≤{RW_MAX_ETC} · 쪽당 CPU ≤{RW_MAX_CPU_PER_PAGE}s",
-              f"- 결과: 4종 {len(rw['official_fp'])}건 · ETC {len(rw['extra'])}건 · 쪽당 CPU {rw['cpu_per_page']}s → **{'PASS' if rw['pass'] else 'FAIL'}**"]
+              f"- 결과: 4종 {len(rw['official_fp'])}건 · ETC {len(rw['extra'])}건 · 쪽당 CPU {rw['cpu_per_page']}s(합계 {rw['cpu_total']}s, time.process_time, 이 머신 실측) → **{'PASS' if rw['pass'] else 'FAIL'}**"]
         for f in rw["official_fp"]:
             L.append(f"  - [4종 오탐] {f['technique']} `{f['location']}` — “{f['evidence_text']}”")
         for f in rw["extra"]:

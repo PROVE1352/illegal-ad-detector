@@ -947,8 +947,13 @@ def test_realworld_noise_not_reported(html):
 def test_realworld_set_passes():
     import eval as ev
     rw = ev.evaluate_realworld()
-    assert rw is not None and rw["pass"], rw
-    assert not rw["official_fp"] and len(rw["extra"]) <= ev.RW_MAX_ETC and rw["cpu_per_page"] <= ev.RW_MAX_CPU_PER_PAGE
+    assert rw is not None, "fixtures/realworld/manifest.json 없음"
+    summary = ev.realworld_summary(rw)
+    print(summary)
+    assert not rw["official_fp"], "4종 오탐: " + summary
+    assert rw["etc_count"] <= ev.RW_MAX_ETC, "ETC 상한 초과: " + summary
+    assert rw["cpu_per_page"] <= ev.RW_MAX_CPU_PER_PAGE, "쪽당 CPU 초과: " + summary
+    assert rw["pass"], summary
 
 
 # ---------- P1-1: 정적 추가 신호(ETC 전용) ----------

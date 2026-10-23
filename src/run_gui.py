@@ -73,7 +73,8 @@ class App(tk.Tk):
         if static_only:   # 제출본은 playwright 없는 정적 빌드
             self.render.set(False)
             self.render_cb.configure(state="disabled")
-            ttk.Label(opts, text="(이 배포본은 정적 분석 전용 — 렌더 비교 미포함)", foreground="#667").pack(side="left", padx=4)
+            ttk.Label(opts, text="(이 배포본은 정적 분석 전용 —\n렌더 비교 미포함)", foreground="#667", justify="left",
+                      wraplength=200).pack(side="left", padx=4)
         btns = ttk.Frame(top)
         btns.grid(row=4, column=0, columnspan=6, sticky="we", pady=(8, 0))
         self.start_btn = ttk.Button(btns, text="탐지 시작", command=self.start)
