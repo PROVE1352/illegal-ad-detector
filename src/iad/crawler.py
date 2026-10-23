@@ -12,7 +12,7 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 import requests
 from bs4 import BeautifulSoup
 
-from .links import host_of, is_same_site
+from .links import LOOPBACK, host_of, is_same_site
 from .models import Page
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) IllegalAdDetector/0.1 (+public-site-audit)"
@@ -202,8 +202,11 @@ class Crawler:
             href = urljoin(page.url, str(ln["href"]).strip())
             if not href.startswith(("http://", "https://")):
                 continue
+            h = host_of(href)
+            # 동일 사이트 CSS 만. 예외: 허용 호스트 목록(하네스)과 로컬 루프백끼리(127.0.0.1 ↔ localhost 로 적힌 href)
             if not is_same_site(href, self.base_host) and not (
-                    self.cfg.allowed_hosts is not None and host_of(href) in self.cfg.allowed_hosts):
+                    (self.cfg.allowed_hosts is not None and h in self.cfg.allowed_hosts)
+                    or (h in LOOPBACK and self.base_host in LOOPBACK)):
                 continue
             css = self._fetch_css(href)
             if not css:

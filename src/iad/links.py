@@ -41,16 +41,12 @@ def is_trusted(host: str) -> bool:
     return any(host == s.lstrip(".") or host.endswith(s) for s in TRUSTED_SUFFIXES)
 
 
-_LOOPBACK = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
+LOOPBACK = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
 
 
 def is_same_site(url: str, base_host: str) -> bool:
     h = host_of(url)
-    if not h:
-        return False
-    if h in _LOOPBACK and base_host in _LOOPBACK:
-        return True   # 로컬 테스트베드: 127.0.0.1 과 localhost 를 같은 사이트로(외부 CSS·링크 수집 누락 방지)
-    return h == base_host or h.endswith("." + base_host) or base_host.endswith("." + h)
+    return bool(h) and (h == base_host or h.endswith("." + base_host) or base_host.endswith("." + h))
 
 
 def analyze_link(href: str, anchor_text: str, base_host: str) -> list[tuple[str, str, float]]:
