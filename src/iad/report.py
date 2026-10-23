@@ -159,7 +159,7 @@ def write_reports(res, out_dir: Path) -> Path:
         "entry_url": res.entry_url, "started_at": res.started.isoformat(timespec="seconds"),
         "finished_at": res.finished.isoformat(timespec="seconds"), "elapsed_sec": round(res.elapsed, 1),
         "pages": len(res.pages), "stopped_reason": res.stopped_reason, "render_used": res.render_used,
-        "browser_stage": getattr(res, "browser_note", ""),
+        "browser_stage": getattr(res, "browser_note", ""), "ocr_stage": getattr(res, "ocr_note", ""),
     }
     rows = finding_rows(res.findings)
     data = json.dumps({"meta": meta, "findings": rows}, ensure_ascii=False).replace("</", "<\\/")

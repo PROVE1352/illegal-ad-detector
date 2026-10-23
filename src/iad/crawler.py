@@ -46,6 +46,7 @@ class CrawlConfig:
     fetch_css: bool = True                 # <link rel=stylesheet>(동일 사이트) 수집해 클래스 규칙 해석
     max_css_files: int = 40                # 사이트 전체에서 받을 고유 CSS 파일 수 상한
     max_css_bytes: int = 1_000_000
+    ocr: bool = True                       # Windows 내장 OCR 로 배너 이미지 글자 판정(Windows 외·엔진 없음은 자동 생략, ETC 전용)
     browser: bool = True                   # OS 의 Edge/Chrome headless --dump-dom 으로 의심 스크립트 페이지 JS 실행 비교(없으면 자동 생략, ETC 전용)
 
 

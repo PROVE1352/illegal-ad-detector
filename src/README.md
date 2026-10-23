@@ -151,6 +151,15 @@ Program Files·LOCALAPPDATA 표준 경로 → PATH. 정책 HeadlessModeEnabled=0
 남긴다(Windows 실측은 하지 않았으므로 "실패하면 정적"이 설계 전제). 하네스(eval.py)는 결정적 비교를 위해 browser=False 로 돌리고, 브라우저 경로는
 가짜 브라우저 스크립트(주입·동일·타임아웃·실패) 테스트와 설치된 Chrome 의 실제 document.write 회수 테스트로 검증한다.
 
+이미지 배너 OCR(R10, Windows 전용·기본 켬, `--no-ocr`/GUI 'OCR(이미지 글자)'): Windows 내장 OCR(Windows.Media.Ocr)을 Windows PowerShell 5.1
+(`-NoProfile -NonInteractive -EncodedCommand`, 스크립트는 UTF-16LE base64, 출력은 UTF-8 JSON 한 줄/이미지)로 호출한다(번들 0, pwsh 7 은 WinRT 없어 불가).
+언어는 ko → 사용자 프로필 언어 → en-US, 엔진이 없으면 생략. 대상은 텍스트 없는 `<a><img></a>` 배너와 alt/title 에 배너·광고·이벤트가 있는 img
+(동일 사이트·외부·data: URI 모두, 2MB·png/jpg/gif/bmp, MaxImageDimension 초과는 축소), 이미지 40개·이미지당 10초·단계 120초·전체 예산 안,
+한 번의 powershell 호출로 일괄 처리. OCR 글자를 기존 사전으로 판정해(키워드 ≥2.0 또는 범주 합 ≥3.0, 행정 문맥 제외) **ETC `IMAGE_TEXT_AD` 로만**
+보고한다(OCR 오인식·캠페인 배너 위험, 이미지 글자는 4종 기법이 아님). Windows 가 아니거나 실패·타임아웃이면 한 줄 경고 후 정적 결과. 데모(post_banner)에
+한글 도박 문구 배너 PNG 와 정상 캠페인 배너 PNG 를 내장했고 라벨은 `platform: win32` 로 Windows 에서만 채점한다. 맥에서는 가짜 실행기로 명령·인코딩·
+파싱·타임아웃·실패 폴백을 테스트한다. Windows 확인: `iad-cli.exe --demo --no-open` 후 result_extra.json 에 IMAGE_TEXT_AD 1건, report.json meta.ocr_stage.
+
 정적 추가 신호(P1-1, 모두 ETC 전용·4종 게이트에 넣지 않음): `HEAD_KEYWORD_INJECTION`(title·meta description/keywords·og:title 에 가중치 ≥2.0
 불법 키워드 + 유인 표현 또는 합계 ≥3.0, 행정 안내 문맥이면 제외), `FOREIGN_GAMBLING`(judi·gacor·togel·maxwin·博彩·娱乐城 등 외국어 도박 상투어가
 서로 다른 2개 이상이거나 불법 키워드와 동반, 라틴어는 단어 경계라 judicial·prejudice 제외), `ONE_CHAR_LINK`(한 글자·구두점 하나에 외부 의심

@@ -1162,3 +1162,77 @@ def test_crawler_connection_error_is_one_line():
     c = Crawler(f"http://127.0.0.1:{port}/a.html", CrawlConfig(delay=0, timeout=1, allowed_hosts=("127.0.0.1",)))
     page = c.fetch(f"http://127.0.0.1:{port}/a.html", 0)
     assert page.error and page.error.startswith("요청 실패: ") and "\n" not in page.error
+
+
+# ---------- R10: Windows 내장 OCR 단계(맥에서는 가짜 실행기로 명령 구성·인코딩·파싱·타임아웃·실패 폴백 검증) ----------
+_FAKE_OCR = '''import sys, os, json, base64, time
+args = sys.argv[1:]
+assert args[:6] == ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand"][:5] + [args[5]], args
+script = base64.b64decode(args[5]).decode("utf-16-le")
+assert "OcrEngine" in script and "[Console]::OutputEncoding" in script and "\\ufeff" not in script
+paths = json.load(open(os.environ["IAD_OCR_LIST"], encoding="utf-8"))
+mode = os.environ.get("FAKE_OCR_MODE", "ok")
+if mode == "slow":
+    time.sleep(30)
+if mode == "fail":
+    sys.exit(1)
+if mode == "noengine":
+    print('{"error":"no_engine"}'); sys.exit(2)
+sys.stdout.buffer.write("\\ufeff".encode("utf-8"))   # BOM 이 섞여도 파싱되어야 한다
+for i, p in enumerate(paths):
+    data = open(p, "rb").read()
+    assert data[:4] == b"\\x89PNG", p
+    text = "토토사이트 추천 안전놀이터 가입코드" if i % 2 == 0 else "불법도박 예방 캠페인 신고 1336"
+    sys.stdout.buffer.write((json.dumps({"i": i, "lang": "ko", "text": text}, ensure_ascii=False) + "\\n").encode("utf-8"))
+'''
+
+
+def _ocr_page(port: int = 1) -> Page:
+    from iad.testbed import BANNER_AD_PNG_B64, BANNER_CAMPAIGN_PNG_B64
+    html = (f'<html><body><p>소식지</p><a id="ad1" href="event/notice.html"><img alt="" src="data:image/png;base64,{BANNER_AD_PNG_B64}"></a>'
+            f'<a id="ok1" href="about.html"><img alt="캠페인 배너" src="data:image/png;base64,{BANNER_CAMPAIGN_PNG_B64}"></a>'
+            f'<a href="x.html"><img alt="" src="data:,"></a><img alt="로고" src="logo.png"></body></html>')
+    return Page(url="http://ex.go.kr/post/banner.html", html=html)
+
+
+def test_ocr_fake_runner_end_to_end(tmp_path, monkeypatch):
+    from iad import ocr as O
+    fake = tmp_path / "fake_ocr.py"
+    fake.write_text(_FAKE_OCR, encoding="utf-8")
+    monkeypatch.setenv("IAD_OCR_EXE", str(fake))
+    monkeypatch.setenv("FAKE_OCR_MODE", "ok")
+    page = _ocr_page()
+    cands = O._candidates(BeautifulSoup(page.html, "lxml"), page.url)
+    assert [c[0].get("id") for c in cands] == ["ad1", "ok1"], cands   # data:, 빈 이미지·로고는 후보 아님
+    static = analyze_page(page, "ex.go.kr")
+    out, note = O.ocr_stage([page], static, "ex.go.kr", None, None, lambda: 100.0, lambda m: None)
+    assert len(out) == 1 and 'id="ad1"' in out[0].html and "IMAGE_TEXT_AD" in out[0].extra_names and not out[0].official, (note, [(f.location, f.extra_names) for f in out])
+    assert BeautifulSoup(page.html, "lxml").select_one(out[0].location).get("id") == "ad1"   # 캠페인 배너(ok1)는 행정 문맥으로 제외
+    assert any(e.rule == "ocr.image_text" and "OCR ko" in e.detail for e in out[0].evidence)
+    assert "광고 판정 1" in note
+
+
+@pytest.mark.parametrize("mode,expect", [("slow", "타임아웃"), ("fail", "타임아웃"), ("noengine", "엔진 없음")])
+def test_ocr_fallbacks_are_one_line(tmp_path, monkeypatch, mode, expect):
+    from iad import ocr as O
+    fake = tmp_path / "fake_ocr.py"
+    fake.write_text(_FAKE_OCR, encoding="utf-8")
+    monkeypatch.setenv("IAD_OCR_EXE", str(fake))
+    monkeypatch.setenv("FAKE_OCR_MODE", mode)
+    monkeypatch.setattr(O, "PER_IMAGE_SEC", 0.5)
+    monkeypatch.setattr(O, "STAGE_BUDGET", 6.0)
+    logs: list[str] = []
+    out, note = O.ocr_stage([_ocr_page()], [], "ex.go.kr", None, None, lambda: 100.0, logs.append)
+    assert out == [] and expect in note, note
+    assert all("\n" not in m for m in logs)
+
+
+def test_ocr_skipped_without_windows(monkeypatch):
+    from iad import ocr as O
+    monkeypatch.delenv("IAD_OCR_EXE", raising=False)
+    if sys.platform != "win32":
+        assert O.powershell_path() is None
+        assert O.ocr_stage([_ocr_page()], [], "ex.go.kr", None, None, lambda: 100.0, lambda m: None) == ([], "Windows OCR 없음(생략)")
+    cmd, env = O.build_command("powershell.exe", "list.json")
+    assert cmd[1:6] == ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand"] and env["IAD_OCR_LIST"] == "list.json"
+    assert __import__("base64").b64decode(cmd[6]).decode("utf-16-le").lstrip().startswith("$ErrorActionPreference")

@@ -31,6 +31,7 @@ class ScanResult:
     stopped_reason: str = ""
     render_used: bool = False
     browser_note: str = ""          # 브라우저(Edge/Chrome headless) 단계 상태 한 줄
+    ocr_note: str = ""              # OCR 단계 상태 한 줄
 
     @property
     def elapsed(self) -> float:
@@ -182,6 +183,19 @@ def scan(entry_url: str, config: CrawlConfig | None = None, out_dir: Path | None
             res.browser_note = f"오류로 생략({e.__class__.__name__})"
     elif cfg.browser:
         res.browser_note = "시간 예산 소진으로 생략"
+    if cfg.ocr and not _over_budget():
+        try:
+            from .ocr import ocr_stage
+            extra, res.ocr_note = ocr_stage(res.pages, res.findings, base_host, crawler.session, cfg.allowed_hosts,
+                                            lambda: max(0.0, deadline - time.monotonic()), log, fetch_timeout=cfg.timeout)
+            res.findings.extend(extra)
+            if extra or "판정" in res.ocr_note:
+                checkpoint.write(force=True)
+        except Exception as e:
+            log(f"OCR 단계를 사용할 수 없어 정적 결과로 계속합니다({e.__class__.__name__}).")
+            res.ocr_note = f"오류로 생략({e.__class__.__name__})"
+    elif cfg.ocr:
+        res.ocr_note = "시간 예산 소진으로 생략"
     if render and _over_budget():
         render = False
         log("시간 예산이 남지 않아 렌더 비교를 생략합니다.")

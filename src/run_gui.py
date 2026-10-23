@@ -72,9 +72,11 @@ class App(tk.Tk):
         self.ext_iframe = tk.BooleanVar(value=True)
         self.cloak = tk.BooleanVar(value=True)
         self.browser = tk.BooleanVar(value=True)
+        self.ocr = tk.BooleanVar(value=True)
         ttk.Checkbutton(opts, text="robots.txt 존중", variable=self.robots).pack(side="left", padx=4)
         ttk.Checkbutton(opts, text="외부 iframe 수집", variable=self.ext_iframe).pack(side="left", padx=4)
         ttk.Checkbutton(opts, text="클로킹 점검(봇 UA 재요청)", variable=self.cloak).pack(side="left", padx=4)
+        ttk.Checkbutton(opts, text="OCR(이미지 글자)", variable=self.ocr).pack(side="left", padx=4)
         ttk.Checkbutton(opts2, text="Edge JS 실행 비교(의심 스크립트 쪽만)", variable=self.browser).pack(side="left", padx=4)
         self.render_cb = ttk.Checkbutton(opts2, text="Edge 렌더 비교(선택, 느림)", variable=self.render)
         self.render_cb.pack(side="left", padx=4)
@@ -172,7 +174,7 @@ class App(tk.Tk):
         self.tree.delete(*self.tree.get_children())
         cfg = CrawlConfig(depth=self.depth.get(), max_pages=self.max_pages.get(), delay=self.delay.get(),
                           respect_robots=self.robots.get(), follow_external_iframes=self.ext_iframe.get(),
-                          cloak_pages=40 if self.cloak.get() else 0, browser=self.browser.get())
+                          cloak_pages=40 if self.cloak.get() else 0, browser=self.browser.get(), ocr=self.ocr.get())
         render = self.render.get()
 
         def work() -> None:
