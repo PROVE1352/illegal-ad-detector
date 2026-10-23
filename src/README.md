@@ -7,7 +7,8 @@
 
 ```
 src/
-  run_gui.py          tkinter GUI (PyInstaller 진입점) — URL 입력, 진행 로그, 검출 결과 화면, 리포트 열기
+  run_gui.py          tkinter GUI (PyInstaller 진입점) — URL 입력, 진행 로그, 검출 결과(우선순위·영역·필터·검색, 더블클릭 상세/조치 가이드,
+                      선택자·URL 복사), 데모 실행, 리포트 열기
   iad/
     __main__.py       CLI  python -m iad --url URL [--depth 3 --max-pages 300 --delay 0.3 --out DIR --result-dir DIR --render]
     scan.py           파이프라인: 크롤 → 분석 → result.json/result_extra.json → report.html/csv/json
@@ -29,7 +30,10 @@ src/
     cloak.py          클로킹 점검: 최상위 페이지(진입→디렉터리별 첫 페이지→나머지, 기본 40개)를 Yeti+네이버검색 Referer / Googlebot
                       으로 다시 받아 일반 응답에 없는 요소·외부 링크·외부 리다이렉트를 ETC(CLOAKING_*) 로 보고(result.json 에는 안 넣음)
     official.py       요강 붙임4 스키마 result.json / result_extra.json 작성
-    report.py         자체완결 HTML 리포트(필터·정렬·근거 펼치기) + CSV + JSON
+    triage.py         작업지시서 보강: 발견 영역 분류(게시글 본문/댓글/목록/푸터/iframe…), 기법별 조치 가이드·신고처, defang URL,
+                      SHA-256 지문(URL+위치+원문 HTML), 처리 우선순위(긴급/높음/보통)
+    report.py         자체완결 HTML 작업지시서(요약 카드·영역별 집계, 필터·정렬·검색·4종만, 행별 조치 가이드·근거·지문, 선택자/URL 복사,
+                      처리 상태·메모(localStorage), 페이지별 작업지시서 인쇄 화면, 상태 JSON 내보내기) + CSV + JSON
     render.py         선택: playwright channel="msedge" 로 정적 DOM vs 렌더 DOM 차이(동적 주입)·요소 스크린샷
     testbed.py        내장 테스트베드: 가짜 공공기관 사이트 생성기(dev/holdout + labels.json) + 로컬 서버(클로킹 .bot 응답 포함)
     demo.py           --demo: 테스트베드를 임시 폴더에 생성·127.0.0.1 로 서빙 → 스캔 → 구동폴더/demo 에 결과·리포트 → 브라우저 열기

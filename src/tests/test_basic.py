@@ -378,3 +378,40 @@ def test_demo_runs_offline(tmp_path):
     off = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))["findings"]
     assert len(off) >= 30 and res.pages
     assert all(f["url"].startswith("http://127.0.0.1:") for f in off)
+
+
+# ---------- AR4: 작업지시서 보강 ----------
+def test_triage_enrichment_and_report_files(tmp_path):
+    from iad.triage import area_of, defang, enrich, fingerprint, priority_of
+    from iad.report import write_reports
+    html = ('<html><body><div class="article-body"><p><span style="display:none">토토사이트 안전놀이터 http://kk8282.top/x</span></p></div>'
+            '<ul class="comments"><li class="comment"><span style="color:#fff">먹튀검증 텔레그램 @x</span></li></ul></body></html>')
+    fs = analyze_page(Page(url="http://ex.go.kr/board/view?id=1", html=html), "ex.go.kr")
+    assert fs
+    areas = {area_of(f) for f in fs}
+    assert "게시글 본문" in areas and "댓글" in areas
+    assert defang("http://kk8282.top/x?a=1") == "hxxp://kk8282[.]top/x?a=1"
+    assert all(len(fingerprint(f)) == 64 for f in fs)
+    assert {priority_of(f) for f in fs} <= {"긴급", "높음", "보통"}
+    e = enrich(fs[0])
+    assert e["guide"] and e["contact"] and e["defanged_url"].startswith("hxxp://")
+
+    from datetime import datetime
+    from iad.official import KST
+
+    class R:  # 최소 ScanResult 흉내
+        entry_url = "http://ex.go.kr/board/list"
+        started = finished = datetime.now(KST)
+        elapsed = 0.0
+        pages = [Page(url="http://ex.go.kr/board/view?id=1", html=html)]
+        findings = fs
+        stopped_reason = ""
+        render_used = False
+
+    out = write_reports(R(), tmp_path)
+    text = out.read_text(encoding="utf-8")
+    assert "작업지시서" in text and "fingerprint" in text and "hxxp://" in text
+    rows = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["findings"]
+    assert rows[0]["area"] and rows[0]["guide"] and rows[0]["fingerprint"]
+    csv_head = (tmp_path / "report.csv").read_text(encoding="utf-8-sig").splitlines()[0]
+    assert "조치요약" in csv_head and "지문(SHA-256)" in csv_head
