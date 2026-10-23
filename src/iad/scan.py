@@ -56,7 +56,7 @@ def scan(entry_url: str, config: CrawlConfig | None = None, out_dir: Path | None
                 crawler.stop()
             res.pages.append(page)
             try:
-                found = analyze_page(page, base_host)
+                found = analyze_page(page, host_of(page.url) if page.external else base_host)
             except Exception as e:  # 한 페이지 실패가 전체를 멈추지 않게
                 log(f"  분석 오류 {page.url}: {e!r}")
                 found = []

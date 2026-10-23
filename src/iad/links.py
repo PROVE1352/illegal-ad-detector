@@ -71,8 +71,9 @@ def analyze_link(href: str, anchor_text: str, base_host: str) -> list[tuple[str,
     m = _DOMAIN_IN_TEXT.search(anchor_text or "")
     if m:
         text_host = m.group(1).lower().removeprefix("www.")
-        if registrable(text_host) != reg and not is_trusted(text_host):
-            out.append(("link.anchor_mismatch", f"앵커 텍스트 도메인({text_host}) ≠ 실제 링크({host})", 2.5))
+        if registrable(text_host) != reg:
+            w = 3.5 if is_trusted(text_host) else 2.5
+            out.append(("link.anchor_mismatch", f"앵커 텍스트 도메인({text_host}) ≠ 실제 링크({host})", w))
     if len(host) > 40:
         out.append(("link.long_host", f"비정상적으로 긴 호스트 ({host[:40]}…)", 1))
     return out

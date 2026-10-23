@@ -28,7 +28,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: src 준비 여부 확인
         id: check
@@ -40,7 +40,7 @@ jobs:
             Write-Host "::warning::src/run_gui.py 또는 src/requirements.txt 가 아직 없어 빌드를 건너뜁니다."
           }
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         if: steps.check.outputs.ready == 'true'
         with:
           python-version: "3.12"
@@ -89,7 +89,7 @@ jobs:
           Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/IllegalAdDetector-windows.zip -Force
           Get-Item build/IllegalAdDetector-windows.zip | Format-Table Name, Length
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: steps.check.outputs.ready == 'true'
         with:
           name: IllegalAdDetector-windows
@@ -97,7 +97,7 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always() && steps.check.outputs.ready == 'true'
         with:
           name: smoke-output
@@ -109,8 +109,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: python -m pip install -r build/requirements-build.txt

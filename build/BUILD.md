@@ -14,13 +14,23 @@ IllegalAdDetector/
   _internal/              Python 3.12 런타임, 라이브러리, Playwright 드라이버
 ```
 
-배포 파일은 이 폴더를 압축한 `IllegalAdDetector-windows.zip` 이다. 압축을 풀고 `IllegalAdDetector.exe` 를 더블클릭하면 실행된다. 설치 과정과 Python 은 필요 없다.
+배포 파일은 이 폴더를 압축한 `IllegalAdDetector-windows.zip` 이다(약 67 MB, 풀면 약 158 MB). 압축을 풀고 `IllegalAdDetector.exe` 를 더블클릭하면 실행된다. 설치 과정과 Python 은 필요 없다. 용량의 대부분(약 94 MB)은 Edge 렌더 비교용 Playwright 드라이버(`_internal/playwright/driver/node.exe`)다.
+
+탐지가 끝나면 적격평가용 결과 파일 `result.json` 과 추가 탐지 결과 `result_extra.json` 이 **구동 파일(exe)이 있는 폴더**에 UTF-8(BOM 없음)으로 생성된다. onedir 방식이라 exe 위치가 곧 실제 폴더이므로 위치가 헷갈리지 않는다. 따라서 압축은 쓰기 권한이 있는 폴더(바탕화면, 문서 등)에 풀어야 한다. `C:\Program Files` 아래처럼 쓰기 권한이 없는 곳은 피한다.
+
+CLI 사용 예:
+
+```
+iad-cli.exe --url https://www.example.go.kr/ --depth 3 --max-pages 300
+iad-cli.exe --help
+```
 
 onefile 대신 onedir 을 고른 이유는 다음과 같다.
 
-1. onefile 은 실행할 때마다 임시 폴더(`%TEMP%\_MEIxxxx`)에 압축을 풀기 때문에 시작이 느리고, 사용자 이름이 한글인 계정이나 보안 프로그램이 임시 폴더를 막는 환경에서 실패할 여지가 있다.
-2. onedir 은 압축 해제 단계가 없어 시작이 빠르고, 백신 오탐도 상대적으로 적다.
-3. GUI 와 CLI 가 런타임을 공유하므로 두 exe 를 따로 onefile 로 만드는 것보다 용량이 작다.
+1. 요강은 result.json 을 구동 파일과 같은 폴더에 만들도록 정한다. onefile 은 실행 중 코드가 임시 폴더에서 돌기 때문에 기준 폴더가 헷갈리기 쉽다. onedir 은 exe 폴더가 그대로 기준 폴더다.
+2. onefile 은 실행할 때마다 임시 폴더(`%TEMP%\_MEIxxxx`)에 압축을 풀기 때문에 시작이 느리고, 사용자 이름이 한글인 계정이나 보안 프로그램이 임시 폴더를 막는 환경에서 실패할 여지가 있다.
+3. onedir 은 압축 해제 단계가 없어 시작이 빠르고, 백신 오탐도 상대적으로 적다.
+4. GUI 와 CLI 가 런타임을 공유하므로 두 exe 를 따로 onefile 로 만드는 것보다 용량이 작다.
 
 ## 2. 필요 환경
 
@@ -82,7 +92,12 @@ Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/Illeg
 
 빌드 직후 같은 러너에서 실행 파일을 **한글과 공백이 들어간 경로**(`%RUNNER_TEMP%\한글 경로\불법광고 탐지기\`)에 복사한 뒤 돌린다.
 
-1. CLI: `src/fixtures` 를 `python -m http.server` 로 로컬 웹서버에 올리고, `iad-cli.exe` 로 크롤링해 HTML 리포트가 한글 경로에 생성되는지 확인한다.
+1. CLI: `src/fixtures` 를 `python -m http.server` 로 로컬 웹서버에 올리고(`src/fixtures/index.html`, 없으면 `src/fixtures/dev/`, 그것도 없으면 `build/smoke_site/` 사용), `iad-cli.exe --url http://127.0.0.1:8765/` 로 크롤링한다. 검사 항목은 다음과 같다.
+   * 종료 코드 0, `--help` 의 한글 출력이 파이프에서 오류 없이 나옴
+   * `result.json` 이 exe 와 같은 폴더(한글 경로)에 생성됨
+   * `result.json`·`result_extra.json` 첫 3바이트가 UTF-8 BOM(EF BB BF)이 아님, JSON 파싱 가능
+   * `meta`(topic, entry_url, started_at, finished_at, elapsed_sec) 와 `findings` 키 존재, 검출 1건 이상
+   * `report.html` 이 한글 경로의 출력 폴더에 생성됨
 2. GUI: `IllegalAdDetector.exe` 를 실행해 tkinter 메인 루프까지 정상 진입하는지 확인한다. 런타임 훅이 진입 시 마커 파일을 쓰고 5초 뒤 창을 닫는다. 창이 뜨기 전에 죽거나 오류 대화상자에서 멈추면 마커가 생기지 않아 실패로 판정한다.
 
 손으로 돌릴 때:
@@ -91,3 +106,16 @@ Compress-Archive -Path build/dist/IllegalAdDetector -DestinationPath build/Illeg
 ./build/smoke_cli.ps1 -AppDir build/dist/IllegalAdDetector -FixturesDir src/fixtures -OutDir $env:TEMP\iad_smoke
 ./build/smoke_gui.ps1 -Exe build/dist/IllegalAdDetector/IllegalAdDetector.exe
 ```
+
+워크플로를 수동 실행할 때 `selftest` 를 체크하면 GUI 판정 로직 자체를 검증한다. 일부러 시작 중에 예외를 던지는 exe 는 Windows 에서 "Unhandled exception in script" 대화상자를 띄운 채 프로세스가 살아 있으므로, 단순히 "몇 초 뒤 프로세스 생존"만 보면 통과로 잘못 판정된다. 마커 방식은 이 경우를 실패로 잡는다(2026-10-23 실행에서 확인).
+
+## 7. 최근 빌드 결과
+
+| 항목 | 값 |
+|---|---|
+| 실행 | GitHub Actions run 39890298957 (커밋 c7d9ad7, 2026-10-23) |
+| 산출물 | `IllegalAdDetector-windows.zip` 66,520,410 bytes, 1,226 files |
+| CLI 스모크 | PASS. 페이지 3개, result.json 5건(HOMOGLYPH, JAMO, OFFSCREEN, TRANSPARENT), BOM 없음 |
+| GUI 스모크 | PASS. mainloop 진입 후 5초 뒤 자동 종료, exit 0 |
+
+평가 PC 조건(요강 붙임3): Windows 11, GPU 없는 일반 PC, 검출 시간 상한 30분. CLI 기본 시간 예산은 `--time-budget 1200`(20분)이다.

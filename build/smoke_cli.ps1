@@ -20,7 +20,10 @@ function Check([bool]$ok, [string]$what) {
 $cli = Join-Path $AppDir "iad-cli.exe"
 if (-not (Test-Path -LiteralPath $cli)) { throw "CLI exe 없음: $cli" }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-# src/fixtures 에 index.html 이 없으면 build/smoke_site (빌드 검증용 최소 사이트)로 대체
+# 테스트 사이트 선택: <Fixtures>/index.html → <Fixtures>/dev/index.html → build/smoke_site
+if (-not (Test-Path -LiteralPath (Join-Path $FixturesDir "index.html")) -and (Test-Path -LiteralPath (Join-Path $FixturesDir "dev/index.html"))) {
+    $FixturesDir = Join-Path $FixturesDir "dev"
+}
 if (-not (Test-Path -LiteralPath (Join-Path $FixturesDir "index.html"))) {
     Write-Host "::warning::$FixturesDir 에 index.html 이 없어 build/smoke_site 로 대체"
     $FixturesDir = Join-Path $PSScriptRoot "smoke_site"

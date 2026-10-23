@@ -1,0 +1,112 @@
+{
+ "meta": {
+  "timestamp": "2026-10-23 11:39:42",
+  "depth": 3,
+  "max_pages": 300,
+  "port": 8765
+ },
+ "results": [
+  {
+   "set": "dev",
+   "entry_url": "http://127.0.0.1:8765/dev/index.html",
+   "pages_crawled": 25,
+   "elapsed_sec": 0.17,
+   "tool_elapsed_sec": 0.16803,
+   "official": {
+    "gold": 26,
+    "reported_units": 26,
+    "tp": 26,
+    "fp": 0,
+    "precision(정확도)": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "per_technique": {
+     "HOMOGLYPH": {
+      "gold": 5,
+      "hit": 5,
+      "recall": 1.0
+     },
+     "JAMO": {
+      "gold": 5,
+      "hit": 5,
+      "recall": 1.0
+     },
+     "TRANSPARENT": {
+      "gold": 8,
+      "hit": 8,
+      "recall": 1.0
+     },
+     "OFFSCREEN": {
+      "gold": 8,
+      "hit": 8,
+      "recall": 1.0
+     }
+    },
+    "false_positives": [],
+    "missed": [],
+    "unresolved": []
+   },
+   "extra": {
+    "gold": 16,
+    "reported": 16,
+    "hit": 16,
+    "recall": 1.0,
+    "false_positives": [],
+    "missed": []
+   },
+   "decoy_hits": [],
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_9ub4ld4h"
+  },
+  {
+   "set": "holdout",
+   "entry_url": "http://127.0.0.1:8765/holdout/index.html",
+   "pages_crawled": 25,
+   "elapsed_sec": 0.1,
+   "tool_elapsed_sec": 0.097014,
+   "official": {
+    "gold": 26,
+    "reported_units": 26,
+    "tp": 26,
+    "fp": 0,
+    "precision(정확도)": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "per_technique": {
+     "HOMOGLYPH": {
+      "gold": 5,
+      "hit": 5,
+      "recall": 1.0
+     },
+     "JAMO": {
+      "gold": 5,
+      "hit": 5,
+      "recall": 1.0
+     },
+     "TRANSPARENT": {
+      "gold": 8,
+      "hit": 8,
+      "recall": 1.0
+     },
+     "OFFSCREEN": {
+      "gold": 8,
+      "hit": 8,
+      "recall": 1.0
+     }
+    },
+    "false_positives": [],
+    "missed": [],
+    "unresolved": []
+   },
+   "extra": {
+    "gold": 16,
+    "reported": 16,
+    "hit": 16,
+    "recall": 1.0,
+    "false_positives": [],
+    "missed": []
+   },
+   "decoy_hits": [],
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_oypw_j4_"
+  }
+ ]
+}

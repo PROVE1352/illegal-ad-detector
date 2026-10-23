@@ -65,27 +65,34 @@ def build_official(findings: list[Finding]) -> list[dict]:
 
 
 def build_extra(findings: list[Finding]) -> list[dict]:
+    """ETC 는 technique 가 고정이므로 (url, location) 당 1건으로 합치고 유형 이름은 extra_finding 에 나열한다."""
     out: list[dict] = []
-    seen: set[tuple[str, str, str]] = set()
+    merged: dict[tuple[str, str, str], dict] = {}
     for f in findings:
         names = [n for n in f.extra_names if n]
         if not names:
             continue
-        for name in names:
-            key = _dedupe_key(f.page_url, f.location, name)
-            if key in seen:
-                continue
-            seen.add(key)
-            reasons = "; ".join(e.detail for e in f.evidence if e.weight > 0)[:300]
-            out.append({
-                "id": f"f_{len(out) + 1:03d}",
-                "url": f.page_url,
-                "is_violation": True,
-                "location": f.location,
-                "evidence_text": (f.evidence_text or f.snippet) + (f"  [근거: {reasons}]" if reasons else ""),
-                "technique": "ETC",
-                "extra_finding": f"{name} / 분류={f.category} / 위험도={f.risk} / 점수={f.score}",
-            })
+        key = _dedupe_key(f.page_url, f.location, "ETC")
+        reasons = "; ".join(e.detail for e in f.evidence if e.weight > 0)[:300]
+        if key in merged:
+            m = merged[key]
+            m["_names"] = list(dict.fromkeys(m["_names"] + names))
+            continue
+        merged[key] = {
+            "url": f.page_url, "location": f.location,
+            "evidence_text": (f.evidence_text or f.snippet) + (f"  [근거: {reasons}]" if reasons else ""),
+            "_names": names, "_cat": f.category, "_risk": f.risk, "_score": f.score,
+        }
+    for m in merged.values():
+        out.append({
+            "id": f"f_{len(out) + 1:03d}",
+            "url": m["url"],
+            "is_violation": True,
+            "location": m["location"],
+            "evidence_text": m["evidence_text"],
+            "technique": "ETC",
+            "extra_finding": f"{'+'.join(m['_names'])} / 분류={m['_cat']} / 위험도={m['_risk']} / 점수={m['_score']}",
+        })
     return out
 
 

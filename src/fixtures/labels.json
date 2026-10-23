@@ -1,0 +1,872 @@
+{
+ "port": 8765,
+ "labels": [
+  {
+   "set": "dev",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c01",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c02",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c03",
+   "technique": "OFFSCREEN",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c04",
+   "technique": "OFFSCREEN",
+   "category": "불법금융",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c05",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c06",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c07",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c08",
+   "technique": "TRANSPARENT",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c09",
+   "technique": "TRANSPARENT",
+   "category": "불법금융",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c10",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c11",
+   "technique": "TRANSPARENT",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c12",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c13",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c14",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c15",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c16",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c17",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c18",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c19",
+   "technique": "JAMO",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c20",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c20",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c21",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c21",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_weather.html",
+   "doc": "widget/notice.html",
+   "element_id": "c22",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_weather.html",
+   "doc": "ext/banner.html",
+   "element_id": "c23",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_jobs.html",
+   "doc": "post/post_jobs.html",
+   "element_id": "c24",
+   "technique": "TRANSPARENT",
+   "category": "기타",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c25",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "HTML_COMMENT",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c26",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "NOSCRIPT",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c27",
+   "technique": "ETC",
+   "category": "기타",
+   "extra_name": "HIDDEN_IFRAME",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c28",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "HIDDEN_MARQUEE",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c29",
+   "technique": "ETC",
+   "category": "성인",
+   "extra_name": "HIDDEN_VISIBILITY_HIDDEN",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c30",
+   "technique": "ETC",
+   "category": "불법금융",
+   "extra_name": "HIDDEN_HIDDEN_ATTR",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c31",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SCRIPT_INJECTION",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c32",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SCRIPT_INJECTION",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c34",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SUSPICIOUS_TLD",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c35",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SHORTENER",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c36",
+   "technique": "ETC",
+   "category": "기타",
+   "extra_name": "ANCHOR_MISMATCH",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c37",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "MESSENGER",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c38",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "OBFUSCATION_INSERT",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c39",
+   "technique": "ETC",
+   "category": "기타",
+   "extra_name": "MASS_EXTERNAL_LINKS",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "event/redirect.html",
+   "doc": "event/redirect.html",
+   "element_id": "c40",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "META_REFRESH",
+   "note": ""
+  },
+  {
+   "set": "dev",
+   "page": "event/redirect.html",
+   "doc": "event/redirect.html",
+   "element_id": "c41",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "JS_REDIRECT",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c01",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c02",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c03",
+   "technique": "OFFSCREEN",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c04",
+   "technique": "OFFSCREEN",
+   "category": "불법금융",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c05",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_budget.html",
+   "doc": "post/post_budget.html",
+   "element_id": "c06",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c07",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c08",
+   "technique": "TRANSPARENT",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c09",
+   "technique": "TRANSPARENT",
+   "category": "불법금융",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c10",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_recruit.html",
+   "doc": "post/post_recruit.html",
+   "element_id": "c11",
+   "technique": "TRANSPARENT",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c12",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c13",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c14",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_festival.html",
+   "doc": "post/post_festival.html",
+   "element_id": "c15",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c16",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c17",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c18",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_water.html",
+   "doc": "post/post_water.html",
+   "element_id": "c19",
+   "technique": "JAMO",
+   "category": "성인",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c20",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c20",
+   "technique": "JAMO",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c21",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_parking.html",
+   "doc": "post/post_parking.html",
+   "element_id": "c21",
+   "technique": "HOMOGLYPH",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_weather.html",
+   "doc": "widget/notice.html",
+   "element_id": "c22",
+   "technique": "OFFSCREEN",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_weather.html",
+   "doc": "ext/banner.html",
+   "element_id": "c23",
+   "technique": "TRANSPARENT",
+   "category": "도박",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_jobs.html",
+   "doc": "post/post_jobs.html",
+   "element_id": "c24",
+   "technique": "TRANSPARENT",
+   "category": "기타",
+   "extra_name": "",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c25",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "HTML_COMMENT",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c26",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "NOSCRIPT",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c27",
+   "technique": "ETC",
+   "category": "기타",
+   "extra_name": "HIDDEN_IFRAME",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c28",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "HIDDEN_MARQUEE",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c29",
+   "technique": "ETC",
+   "category": "성인",
+   "extra_name": "HIDDEN_VISIBILITY_HIDDEN",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c30",
+   "technique": "ETC",
+   "category": "불법금융",
+   "extra_name": "HIDDEN_HIDDEN_ATTR",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c31",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SCRIPT_INJECTION",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_library.html",
+   "doc": "post/post_library.html",
+   "element_id": "c32",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SCRIPT_INJECTION",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c34",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SUSPICIOUS_TLD",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c35",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "SHORTENER",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c36",
+   "technique": "ETC",
+   "category": "기타",
+   "extra_name": "ANCHOR_MISMATCH",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c37",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "MESSENGER",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c38",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "OBFUSCATION_INSERT",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "post/post_culture.html",
+   "doc": "post/post_culture.html",
+   "element_id": "c39",
+   "technique": "ETC",
+   "category": "기타",
+   "extra_name": "MASS_EXTERNAL_LINKS",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "event/redirect.html",
+   "doc": "event/redirect.html",
+   "element_id": "c40",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "META_REFRESH",
+   "note": ""
+  },
+  {
+   "set": "holdout",
+   "page": "event/redirect.html",
+   "doc": "event/redirect.html",
+   "element_id": "c41",
+   "technique": "ETC",
+   "category": "도박",
+   "extra_name": "JS_REDIRECT",
+   "note": ""
+  }
+ ],
+ "decoys": {
+  "dev": [
+   "post/notice_gambling_prevention.html",
+   "post/notice_gender_edu.html",
+   "post/notice_loan.html",
+   "post/notice_block.html",
+   "post/notice_drug.html",
+   "post/notice_links.html",
+   "post/notice_adult_health.html",
+   "index.html",
+   "list2.html",
+   "about.html"
+  ],
+  "holdout": [
+   "post/notice_gambling_prevention.html",
+   "post/notice_gender_edu.html",
+   "post/notice_loan.html",
+   "post/notice_block.html",
+   "post/notice_drug.html",
+   "post/notice_links.html",
+   "post/notice_adult_health.html",
+   "index.html",
+   "list2.html",
+   "about.html"
+  ]
+ },
+ "schema": "labels[]: set, page(최상위 페이지), doc(요소가 실제로 있는 문서), element_id, technique(HOMOGLYPH|JAMO|TRANSPARENT|OFFSCREEN|ETC), category, extra_name"
+}

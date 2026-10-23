@@ -24,6 +24,8 @@ TEXT_TAGS = {"p", "div", "span", "li", "td", "th", "font", "b", "strong", "em", 
              "a", "caption", "summary", "details", "aside", "header", "footer", "nav", "main", "tr", "ul", "ol",
              "table", "tbody", "form", "fieldset", "legend"}
 SKIP_TAGS = {"script", "style", "head", "title", "meta", "link", "svg", "path", "html", "noscript", "template"}
+BLOCK_TAGS = {"p", "div", "li", "tr", "td", "th", "table", "ul", "ol", "h1", "h2", "h3", "h4", "section", "article",
+              "blockquote", "dl", "dd", "dt", "form", "nav", "header", "footer", "pre"}
 CONTAINER_TAGS = {"div", "td", "article", "section", "li", "dd", "blockquote", "p", "body"}
 HIDDEN_WEIGHT = {
     "display_none": 2.5, "visibility_hidden": 2.5, "opacity_zero": 2.5, "font_size_zero": 2.5, "offscreen": 2.5,
@@ -138,7 +140,7 @@ class PageAnalyzer:
             cats[cat] = min(total, 8.0)
         if cats and allow_whitelist:
             wl = match_whitelist(text)
-            for kw, w in wl[:4]:
+            for kw, w in wl[:6]:
                 f.add("context.whitelist", f"정상 문맥 '{kw}'", w, "context")
             if not wl:
                 for kw, w in match_whitelist(self.page_context)[:3]:
@@ -172,6 +174,8 @@ class PageAnalyzer:
                 f.techniques.append(tech)
 
     def _finalize(self, f: Finding, cats: dict[str, float]) -> None:
+        if self.page.external and not f.has_group("keyword") and not f.has_group("hidden"):
+            return  # 외부 iframe 문서 안의 단순 링크는 보고하지 않는다(그 사이트 내부 링크일 뿐)
         content = f.has_group("keyword") or f.has_group("link") or f.has_group("script")
         if not content:
             return
@@ -285,7 +289,6 @@ class PageAnalyzer:
                 rules = analyze_meta_refresh(str(m.get("content", "")), self.base_host)
                 if rules:
                     f = self._new(m)
-                    f.location = self.page.frame_prefix + "html > head > " + location_of(m)
                     f.evidence_text = f'<meta http-equiv="refresh" content="{m.get("content")}">'
                     for rule, detail, w in rules:
                         f.add(rule, detail, w, "script")
@@ -414,7 +417,7 @@ class PageAnalyzer:
         self._finalize(f, cats)
 
     # ---------- HOMOGLYPH / JAMO ----------
-    def _obf_codes(self, text: str) -> tuple[set[str], list[tuple[str, float, str]], dict[str, float]]:
+    def _obf_codes(self, text: str, leaf: bool = True) -> tuple[set[str], list[tuple[str, float, str]], dict[str, float]]:
         """텍스트에서 요강 난독화 코드 집합을 구한다."""
         codes: set[str] = set()
         allhits: list[tuple[str, float, str]] = []
@@ -427,8 +430,9 @@ class PageAnalyzer:
                     continue
                 if lv in ("JAMO", "HOMOGLYPH"):
                     codes.add(lv)
-        if allhits and max(w for _, w, _ in allhits) >= 1.0:
+        if leaf and allhits and max(w for _, w, _ in allhits) >= 2.0:
             # 평문 키워드 + 문자 단서(전각·키릴 / 합성 가능 자모) → 해당 기법으로 본다(요강 예시 ｍｅｇａ－ＢＥＴ 첫충)
+            # 블록 자식이 없는 요소(leaf)에서만: 컨테이너 수준에서 날짜 전각숫자와 키워드가 우연히 합쳐지는 오탐 방지
             if has_homoglyph_chars(text):
                 codes.add("HOMOGLYPH")
             if has_composable_jamo(text):
@@ -446,14 +450,15 @@ class PageAnalyzer:
             text = el.get_text(" ")
             if not text.strip():
                 continue
-            codes, hits, cats = self._obf_codes(text)
+            leaf = not el.find(list(BLOCK_TAGS))
+            codes, hits, cats = self._obf_codes(text, leaf)
             if not codes:
                 continue
             # 자식 요소가 같은 코드를 모두 설명하면 자식에게 맡긴다(가장 안쪽 요소 선택)
             child_codes: set[str] = set()
             for ch in el.find_all(True, recursive=False):
                 if ch.name in TEXT_TAGS:
-                    child_codes |= self._obf_codes(ch.get_text(" "))[0]
+                    child_codes |= self._obf_codes(ch.get_text(" "), not ch.find(list(BLOCK_TAGS)))[0]
             own = codes - child_codes
             if not own:
                 continue

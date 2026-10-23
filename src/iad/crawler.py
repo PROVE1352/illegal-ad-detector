@@ -30,6 +30,7 @@ class CrawlConfig:
     follow_external_iframes: bool = True
     time_budget_sec: float = 20 * 60     # 요강 타임아웃 30분 → 기본 20분에 중단
     max_html_bytes: int = 3_000_000
+    allowed_hosts: tuple[str, ...] | None = None   # 설정 시 이 호스트들만 요청(하네스용 오프라인 가드)
 
 
 def normalize_url(url: str) -> str:
@@ -117,6 +118,9 @@ class Crawler:
               external: bool = False, top_url: str | None = None, frame_prefix: str = "") -> Page:
         page = Page(url=url, html="", depth=depth, parent_url=parent, is_iframe=is_iframe, external=external,
                     top_url=top_url, frame_prefix=frame_prefix)
+        if self.cfg.allowed_hosts is not None and host_of(url) not in self.cfg.allowed_hosts:
+            page.error = "허용되지 않은 호스트(오프라인 가드)"
+            return page
         try:
             if self.pages_fetched > 0 and self.cfg.delay > 0:
                 time.sleep(self.cfg.delay)
@@ -160,8 +164,11 @@ class Crawler:
         self.started = time.monotonic()
         queue: list[tuple[str, int, str | None]] = [(self.start_url, 0, None)]
         self.seen.add(normalize_url(self.start_url))
+        entry_dir = urlparse(self.start_url).path.rsplit("/", 1)[0] + "/"
         while queue and self._budget_left():
-            url, depth, parent = queue.pop(0)
+            # 진입 URL 과 같은 경로(게시판) 아래 링크를 먼저 처리해 게시글·페이지네이션을 우선 수집
+            idx = next((i for i, (u, _, _) in enumerate(queue) if urlparse(u).path.startswith(entry_dir)), 0)
+            url, depth, parent = queue.pop(idx)
             if not self._allowed(url):
                 self.log(f"robots.txt 차단: {url}")
                 continue
