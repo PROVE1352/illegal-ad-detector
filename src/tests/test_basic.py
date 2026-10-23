@@ -1133,3 +1133,32 @@ def test_gui_labels_fit_at_min_width():
         assert app.static_note.cget("wraplength") > 40 if hasattr(app, "static_note") else True
     finally:
         app.destroy()
+
+
+# ---------- R9: 테스트베드 서버는 클라이언트 조기 종료(WinError 10053 등)에 트레이스백을 찍지 않는다 ----------
+def test_testbed_server_quiet_on_client_disconnect(tmp_path, capsys):
+    from iad.testbed import TestbedServer, pick_port, serve
+    srv = serve(tmp_path, pick_port(0))
+    try:
+        assert isinstance(srv, TestbedServer)
+        for exc in (ConnectionAbortedError(10053, "WinError 10053"), ConnectionResetError(), BrokenPipeError()):
+            try:
+                raise exc
+            except OSError:
+                srv.handle_error(None, ("127.0.0.1", 1))
+        assert capsys.readouterr().err == ""
+        try:
+            raise ValueError("진짜 오류")
+        except ValueError:
+            srv.handle_error(None, ("127.0.0.1", 1))
+        assert "진짜 오류" in capsys.readouterr().err   # 다른 예외는 기존대로 출력
+    finally:
+        srv.shutdown()
+
+
+def test_crawler_connection_error_is_one_line():
+    from iad.crawler import Crawler, CrawlConfig
+    port = __import__("iad.testbed", fromlist=["pick_port"]).pick_port(0)   # 아무도 안 듣는 포트
+    c = Crawler(f"http://127.0.0.1:{port}/a.html", CrawlConfig(delay=0, timeout=1, allowed_hosts=("127.0.0.1",)))
+    page = c.fetch(f"http://127.0.0.1:{port}/a.html", 0)
+    assert page.error and page.error.startswith("요청 실패: ") and "\n" not in page.error

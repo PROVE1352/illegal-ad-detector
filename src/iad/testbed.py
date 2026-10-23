@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import random
+import sys
 import re
 import socket
 import threading
@@ -557,7 +559,24 @@ def pick_port(preferred: int = 0) -> int:
         return s.getsockname()[1]
 
 
+_QUIET_ERRORS = (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)
+
+
+class TestbedServer(ThreadingHTTPServer):
+    """클라이언트(브라우저 headless --dump-dom, 크롤러 타임아웃)가 응답 도중 연결을 끊는 것은 오류가 아니다.
+    Windows 의 WinError 10053/10054 등 연결 끊김 예외는 디버그 로그에만 남기고 콘솔 트레이스백을 찍지 않는다. 다른 예외는 기존대로."""
+
+    daemon_threads = True
+
+    def handle_error(self, request, client_address) -> None:  # noqa: D102
+        exc = sys.exc_info()[1]
+        if isinstance(exc, _QUIET_ERRORS):
+            logging.getLogger("iad.testbed").debug("클라이언트 연결 끊김 %s: %s", client_address, exc)
+            return
+        super().handle_error(request, client_address)
+
+
 def serve(root: Path, port: int) -> ThreadingHTTPServer:
-    httpd = ThreadingHTTPServer(("127.0.0.1", port), partial(TestbedHandler, directory=str(root)))
+    httpd = TestbedServer(("127.0.0.1", port), partial(TestbedHandler, directory=str(root)))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd
