@@ -141,6 +141,11 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 스크립트 주입·인코딩 근거는 디코딩/주입 내용에 비신뢰 외부 URL 또는 불법 키워드가 있을 때만 강하게(정상 jQuery 템플릿·분석 스크립트는 1.0/0.5).
 짧은 키워드(영문 ≤8자, 한글 ≤2자)는 JSON/CSS/JS 의 따옴표·괄호·콜론 경계를 넘어 이어 붙은 우연한 일치("s1":"ot"→slot)를 세지 않는다.
 
+정적 추가 신호(P1-1, 모두 ETC 전용·4종 게이트에 넣지 않음): `HEAD_KEYWORD_INJECTION`(title·meta description/keywords·og:title 에 가중치 ≥2.0
+불법 키워드 + 유인 표현 또는 합계 ≥3.0, 행정 안내 문맥이면 제외), `FOREIGN_GAMBLING`(judi·gacor·togel·maxwin·博彩·娱乐城 등 외국어 도박 상투어가
+서로 다른 2개 이상이거나 불법 키워드와 동반, 라틴어는 단어 경계라 judicial·prejudice 제외), `ONE_CHAR_LINK`(한 글자·구두점 하나에 외부 의심
+도메인을 건 링크, 이미지 링크·신뢰 도메인·일반 .com 제외).
+
 ## 빌드 (PyInstaller, Windows)
 - 진입점 `src/run_gui.py` (CLI 는 `python -m iad`). 데이터 파일 없음(키워드 사전은 .py, `--demo` 테스트 사이트도 `iad/testbed.py` 가
   실행 시점에 임시 폴더에 생성하므로 `src/fixtures/` 를 번들할 필요 없음). `collect_submodules("iad")` 로 testbed/demo/cloak 모듈이 포함된다.

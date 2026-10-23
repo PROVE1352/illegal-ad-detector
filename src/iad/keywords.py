@@ -101,6 +101,18 @@ def inducement_words(text: str) -> list[str]:
     return [w for w in AD_INDUCEMENT if w in plain]
 
 
+# 외국어 도박 스팸 상투어(ETC 전용, 4종 게이트에 넣지 않음). 라틴 단어는 단어 경계로만 매칭(judicial·prejudice·Togo 제외).
+# 한 단어만으로는 보고하지 않고(관광 안내문의 カジノ 등) 서로 다른 2개 이상이거나 불법 키워드와 함께 나올 때만 근거가 된다.
+FOREIGN_GAMBLING_RE = re.compile(
+    r"(?<![a-z0-9])(?:judi|gacor|togel|maxwin|situs\s+slot|slot\s+gacor|rtp\s+live|link\s+alternatif)(?![a-z0-9])"
+    r"|博彩|赌场|娱乐城|百家乐|老虎机|カジノ|オンラインカジノ", re.I)
+
+
+def foreign_gambling_hits(text: str) -> list[str]:
+    """서로 다른 외국어 도박 상투어 목록(소문자, 공백 정규화)."""
+    return list(dict.fromkeys(re.sub(r"\s+", " ", m.group(0).lower()) for m in FOREIGN_GAMBLING_RE.finditer(text or "")))
+
+
 _STRUCT = re.compile(r"""["'{}\[\]:;,<>|=()\\/]""")   # JSON·CSS·JS 구조 문자(짧은 키워드의 경계)
 
 # 정규화 단계별 사전 캐시: cat -> [(plain, jamo, homo, full, orig, weight)]

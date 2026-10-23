@@ -949,3 +949,35 @@ def test_realworld_set_passes():
     rw = ev.evaluate_realworld()
     assert rw is not None and rw["pass"], rw
     assert not rw["official_fp"] and len(rw["extra"]) <= ev.RW_MAX_ETC and rw["cpu_per_page"] <= ev.RW_MAX_CPU_PER_PAGE
+
+
+# ---------- P1-1: 정적 추가 신호(ETC 전용) ----------
+def _etc(html, base="mois.go.kr"):
+    fs = analyze_page(Page(url=f"http://www.{base}/p", html=html), base)
+    assert all(not f.official for f in fs), [(f.location, f.official) for f in fs]
+    return [n for f in fs for n in f.extra_names]
+
+
+def test_head_keyword_injection_etc_only():
+    assert "HEAD_KEYWORD_INJECTION" in _etc('<html><head><title>토토사이트 추천 안전놀이터 가입코드</title></head><body><p>공지</p></body></html>')
+    assert "HEAD_KEYWORD_INJECTION" in _etc('<html><head><title>행정안전부</title><meta name="keywords" content="카지노사이트, 바카라사이트 추천, 슬롯 보너스 입금"></head><body><p>공지</p></body></html>')
+
+
+@pytest.mark.parametrize("html", [
+    '<html><head><title>불법도박 신고센터 안내 - 사행산업통합감독위원회</title><meta name="description" content="불법 도박 신고 및 단속 안내"></head><body><p>x</p></body></html>',
+    '<html><head><title>행정안전부 공지사항</title><meta property="og:title" content="2026년 지방재정 공시"></head><body><p>x</p></body></html>',
+])
+def test_head_normal_not_reported(html):
+    assert _etc(html) == []
+
+
+def test_foreign_gambling_terms():
+    assert "FOREIGN_GAMBLING" in _etc('<html><body><p>situs judi slot gacor togel maxwin hari ini</p></body></html>')
+    assert _etc('<html><body><p>Judicial review of the prejudice standard; Togo delegation visit.</p></body></html>') == []
+    assert _etc('<html><body><p>カジノ 관광 산업 동향 보고</p></body></html>') == []
+
+
+def test_one_char_link():
+    assert "ONE_CHAR_LINK" in _etc('<html><body><p>안내 <a href="http://kr-bet777.top/">.</a> 문의</p></body></html>')
+    assert _etc('<html><body><p><a href="https://www.korea.kr/">›</a></p></body></html>') == []
+    assert _etc('<html><body><p><a href="https://example.com/x">·</a></p></body></html>') == []

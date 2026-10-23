@@ -13,8 +13,8 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Comment, NavigableString, Tag
 
 from . import hidden as H
-from .keywords import (CATEGORY_LABEL, LEVEL_PLAIN, admin_context_score, inducement_words, match_keywords_levels,
-                       match_whitelist)
+from .keywords import (CATEGORY_LABEL, LEVEL_PLAIN, admin_context_score, foreign_gambling_hits, inducement_words,
+                       match_keywords_levels, match_whitelist)
 from .links import analyze_link, find_urls_in_text, host_of, idn_homograph_hosts, is_same_site, is_trusted
 from .models import Finding, Page
 from .normalize import collapse_spaces, has_composable_jamo, has_homoglyph_chars
@@ -191,6 +191,12 @@ class PageAnalyzer:
                         f.techniques.append("obfuscation")
                     total += 1.5
             cats[cat] = min(total, 8.0)
+        fg = foreign_gambling_hits(text)
+        if len(fg) >= 2 or (fg and cats):
+            # 외국어 도박 상투어는 4종 게이트(cats)에 넣지 않고 ETC 근거로만 쓴다
+            f.add("keyword.foreign_gambling", f"외국어 도박 상투어 {', '.join(fg[:4])}", 3.0 if len(fg) >= 2 else 1.5, "keyword")
+            if "FOREIGN_GAMBLING" not in f.extra_names:
+                f.extra_names.append("FOREIGN_GAMBLING")
         if cats and allow_whitelist:
             wl = match_whitelist(text, window=ADMIN_WINDOW)
             obf = any(e.rule == "keyword.obfuscated" for e in f.evidence)
@@ -274,6 +280,7 @@ class PageAnalyzer:
     # ---------- 단계 ----------
     def run(self) -> list[Finding]:
         self._comments()
+        self._head_keywords()
         self._meta_refresh()
         self._scripts()
         self._iframes()
@@ -357,6 +364,44 @@ class PageAnalyzer:
                 f.add("link.hidden_external", "noscript 안의 외부 링크", 1.5, "link")
             self._cover(ns)
             self._finalize(f, cats)
+
+    HEAD_META = ("description", "keywords", "og:title", "og:description", "twitter:title", "twitter:description")
+
+    def _head_keywords(self) -> None:
+        """head 키워드 주입(ETC HEAD_KEYWORD_INJECTION): title·meta description/keywords·og:title 에 강한 불법 키워드(≥2.0)가 있고
+        행정 문맥(신고·단속·예방 안내)이 아닐 때. 본문이 아니므로 4종 대상이 아니며 result_extra 로만 보고한다."""
+        head = self.soup.head
+        if head is None:
+            return
+        items: list[tuple[Tag, str]] = []
+        if self.soup.title is not None:
+            items.append((self.soup.title, self.soup.title.get_text(" ")))
+        for m in head.find_all("meta"):
+            name = (str(m.get("name", "")) + " " + str(m.get("property", ""))).lower()
+            if any(k in name for k in self.HEAD_META):
+                items.append((m, str(m.get("content", ""))))
+        for el, text in items:
+            text = text.strip()
+            if len(text) < 2:
+                continue
+            f = self._new(el)
+            f.evidence_text = text[:300]
+            cats, max_w = self._add_keywords(f, text)
+            if max_w < OFFICIAL_MIN_KEYWORD:
+                continue
+            kw = sum(e.weight for e in f.evidence if e.group == "keyword")
+            ctx = sum(e.weight for e in f.evidence if e.group == "context")
+            if kw + ctx < OFFICIAL_MIN_KEYWORD or self._is_admin_notice(f, text):
+                continue
+            if inducement_words(text) or len(cats) >= 1 and kw >= OFFICIAL_MIN_SUM:
+                f.add("head.keyword_injection", f"<{el.name}> 에 불법 키워드 주입(검색 노출용)", 2.0, "keyword")
+                f.techniques.append("head_injection")
+                f.extra_names.append("HEAD_KEYWORD_INJECTION")
+                for u in find_urls_in_text(text):
+                    if not is_same_site(u, self.base_host):
+                        f.links.append(u)
+                    self._link_rules(f, u, "")
+                self._finalize(f, cats)
 
     def _meta_refresh(self) -> None:
         for m in self.soup.find_all("meta"):
@@ -561,6 +606,13 @@ class PageAnalyzer:
         self._idn_homograph(f, a, text)
         if f.has_group("link") and f.has_group("keyword"):
             f.add("combo.keyword_link", "의심 링크 + 키워드 동시 출현", 1.5, "link")
+        bare = re.sub(r"[\s\u200b\u00a0\ufeff]", "", text)
+        if len(bare) <= 1 and not alt.strip() and a.find("img") is None and f.has_group("link") and \
+                any(not is_trusted(host_of(u)) for u in f.links):
+            # 한 글자·구두점(., ·, |) 하나에 외부 의심 도메인(의심 TLD·무작위 라벨·키워드 호스트)을 건 링크 = 사람 눈에 안 띄는 SEO 링크(ETC)
+            f.add("link.one_char", f"한 글자 링크 '{bare or '(빈 텍스트)'}' → 외부 의심 도메인", 2.0, "link")
+            f.techniques.append("one_char_link")
+            f.extra_names.append("ONE_CHAR_LINK")
         if "idn_homograph" in f.techniques and (cats and max_w >= 1.0 or self._parent_has_keyword(a)):
             f.official.append("HOMOGLYPH")
         if self._is_admin_notice(f, text + " " + _direct_text(a.parent) if isinstance(a.parent, Tag) else text):
