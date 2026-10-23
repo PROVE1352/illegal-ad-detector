@@ -31,7 +31,7 @@ src/
     links.py          링크 휴리스틱(의심 TLD, 숫자 도메인, 단축 URL, 텔레그램/오픈채팅, 앵커-도메인 불일치, 대량 외부링크)
     scripts.py        document.write/innerHTML 링크 주입, eval, meta refresh, JS 리다이렉트,
                       인코딩 디코딩(base64·fromCharCode·\x/\u 이스케이프·%XX·hex 문자열·배열 join, 최대 3겹) 후 키워드·링크 재분석
-    cloak.py          클로킹 점검: 최상위 페이지(진입→디렉터리별 첫 페이지→나머지, 기본 40개)를 Yeti+네이버검색 Referer / Googlebot
+    cloak.py          클로킹 점검: 최상위 페이지(진입→디렉터리별 첫 페이지→디렉터리 라운드로빈, 기본 40개; 20개면 테스트베드 ETC 22→21 이라 유지)를 Yeti+네이버검색 Referer / Googlebot
                       으로 다시 받아 일반 응답에 없는 요소·외부 링크·외부 리다이렉트를 ETC(CLOAKING_*) 로 보고(result.json 에는 안 넣음)
     official.py       요강 붙임4 스키마 result.json / result_extra.json 작성
     triage.py         작업지시서 보강: 발견 영역 분류(게시글 본문/댓글/목록/푸터/iframe…), 기법별 조치 가이드·신고처, defang URL,
@@ -62,8 +62,12 @@ uv run pytest -q
 
 - **결과 파일 보장(결정)**: 탐지 시작 직후 빈 `findings: []` 로 두 파일을 만들고, 페이지마다(최소 2초 간격) 임시 파일 + `os.replace` 로 원자적
   갱신한다(meta.finished_at/elapsed_sec 도 매번 갱신). SIGINT/SIGTERM/SIGBREAK 와 프로세스 종료(atexit) 때 마지막 상태를 한 번 더 쓴다.
-  시간 예산(기본 20분)은 벽시계 기준으로 크롤·분석·클로킹·렌더 모두에 적용되어 30분 강제 종료 전에 끝난다. 따라서 평가 중 강제 종료되어도
-  그때까지의 검출이 담긴 유효한 result.json 이 남는다.
+  시간 예산(기본 20분)은 벽시계 기준으로 크롤·분석·클로킹·브라우저·OCR·렌더 모두에 적용되어 30분 강제 종료 전에 끝난다. 따라서 평가 중 강제 종료되어도
+  그때까지의 검출이 담긴 유효한 result.json 이 남는다. **result.json 은 공식 4종 분석이 끝나는 즉시 확정 기록**되며(meta.finished_at·elapsed_sec 는 그 시점),
+  이후의 클로킹·Edge 브라우저·OCR 단계는 ETC 전용이라 result_extra.json 과 리포트만 갱신한다. 결과 폴더에 쓸 수 없으면 작업 폴더 → %LOCALAPPDATA%\\IllegalAdDetector 로 폴백한다.
+- **외부 요청 대상·결과 미전송**: 네트워크 요청은 점검 대상 누리집(페이지·동일 사이트 CSS·클로킹 재요청·Edge 브라우저 단계의 같은 페이지 재방문) +
+  외부 iframe 1단계 + OCR 대상 배너 이미지(최대 40개, 외부 호스트 포함)뿐이다. 탐지 결과·페이지 내용은 어디로도 전송하지 않으며(상용 AI API 없음),
+  OCR 은 Windows 내장 엔진으로 로컬에서만 돈다.
 - `result.json`, `result_extra.json` 은 **구동 파일이 있는 폴더**에 생성한다. frozen exe 면 `sys.executable` 의 폴더,
   소스 실행이면 현재 작업 폴더(`--result-dir` 로 변경 가능). UTF-8, BOM 없음, 들여쓰기 2.
 - `meta.topic` 은 요강 예시값 그대로 `"TOPIC"` 을 쓴다(표의 "TOPIC(불법광고)" 는 설명으로 해석). 필수 meta 필드
@@ -138,7 +142,7 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 - **결과 파일 쓰기 폴백(R11)**: 결과 폴더(기본 exe 폴더)에 쓰기 시험(임시 파일 생성·삭제)을 해서 실패하면 현재 작업 폴더 → %LOCALAPPDATA%\\IllegalAdDetector
   (없으면 홈/IllegalAdDetector) 순으로 바꾸고 실제 경로를 로그·GUI 상태줄에 안내한다. 도중에 쓰기가 실패해도 폴백으로 한 번 더 시도하고, 전혀 못 써도 스캔은 죽지 않는다.
 - **실사이트 정상 세트** `fixtures/realworld/`(행안부 게시판 10쪽 + 외부 CSS 9개, 공개 페이지를 1초 간격으로 1회 수집, manifest.json):
-  오프라인으로 분석해 4종 0건 · ETC ≤9 · 쪽당 CPU ≤1.0s(맥 실측 0.22s, Windows CI 러너 편차 감안) 를 통과 조건으로 EVAL_RESULT.md 에 PASS/FAIL 을 적는다(정상 공공 사이트 잡음 회귀 방지).
+  오프라인으로 분석해 4종 0건 · ETC ≤9 · 쪽당 CPU ≤1.0s(약 0.23s(개발용 맥), Windows CI 러너 편차 감안) 를 통과 조건으로 EVAL_RESULT.md 에 PASS/FAIL 을 적는다(정상 공공 사이트 잡음 회귀 방지).
 
 실사이트 잡음 억제 규칙(P0-3): 폼 컨트롤(input/select/textarea/button…)은 텍스트 광고가 아니므로 4종 대상에서 제외(ETC 만).
 숨긴 메뉴의 외부 링크는 비신뢰 외부 링크가 3개 이상이거나 링크의 절반 이상일 때만 HIDDEN_EXTERNAL_LINK. HTML 주석은 에디터 메타데이터
@@ -175,16 +179,22 @@ Program Files·LOCALAPPDATA 표준 경로 → PATH. 정책 HeadlessModeEnabled=0
   실행 시점에 임시 폴더에 생성하므로 `src/fixtures/` 를 번들할 필요 없음). `collect_submodules("iad")` 로 testbed/demo/cloak 모듈이 포함된다.
 - hidden imports: `lxml._elementpath`, `bs4.builder._lxml`, `soupsieve`, `requests`, `charset_normalizer`, `idna`,
   `urllib3`, `tkinter`, `tkinter.ttk`. playwright 는 번들하지 않아도 되며(없으면 자동 생략), 넣으려면 `--extra render`.
-- 예: `pyinstaller --noconfirm --onefile --windowed --name iad run_gui.py --collect-submodules lxml --hidden-import bs4.builder._lxml`
+- 예: `pyinstaller build/iad.spec` (onedir; GUI `iad.exe` + CLI `iad-cli.exe`, 스펙 파일이 hidden import·`collect_submodules("iad")` 를 담고 있다)
 - 기본값(깊이 3, 300페이지, 0.3s 간격, 10s 타임아웃, 시간 예산 20분, 클로킹 점검 40페이지×2요청)으로 30분 타임아웃 안에 끝난다.
   크롤 시간 예산을 다 쓰면 클로킹 점검은 건너뛴다. `--cloak-pages 0`(GUI 체크 해제)으로 끌 수 있다.
 
 ## 알려진 한계
 - 정적 분석 중심. 외부 CSS 는 동일 사이트 것만 받고(타 도메인 CDN CSS 는 안 받음), 의사클래스·`calc()`·CSS 변수(`var()`)·
-  미디어쿼리 조건(화면 크기)은 해석하지 않는다. JS 로 뒤늦게 붙는 클래스/스타일은 `--render` 일 때만 보인다.
-- 렌더 비교·스크린샷은 Edge+playwright 가 있을 때만(선택). 동적 주입은 그때만 잡힌다.
-- 키워드 사전 기반이라 사전에 없는 신조어는 놓칠 수 있다. 이미지(배너) 안 문구는 보지 않는다.
+  미디어쿼리 조건(화면 크기)은 해석하지 않는다. JS 로 뒤늦게 붙는 클래스/스타일·동적 주입은 Edge/Chrome 브라우저 단계(기본 켬, `--dump-dom`)가
+  인라인 스크립트에 주입 흔적이 있는 페이지만 다시 보며, 그 결과는 ETC(DYNAMIC_INJECTION)로만 보고한다. 브라우저가 없거나 정책으로 막히면 정적 결과만 남는다.
+- 요소 스크린샷은 Edge+playwright 가 있을 때만(선택, `--render`).
+- 키워드 사전 기반이라 사전에 없는 신조어는 놓칠 수 있다. 이미지(배너) 안 문구는 Windows 내장 OCR 단계(기본 켬)로만 보며(ETC IMAGE_TEXT_AD),
+  Windows 외 OS·ko 언어팩이 없는 PC 에서는 보지 않는다. OCR 오인식 가능성 때문에 4종에는 넣지 않는다.
 - 로그인 뒤 페이지는 수집하지 못한다. POST 폼 게시판은 '함수 인자 → hidden 필드' 대입이 인라인 스크립트에 있을 때만 재현한다
   (외부 JS 파일의 함수, 토큰·세션 검증이 있는 폼은 재현 불가).
 - 외부 사이트로 나가는 배너 링크의 목적지(1-hop)는 열어 보지 않는다(평가 환경이 폐쇄망이면 타임아웃만 쌓이고, 대상 사이트 외
   네트워크 접근을 하지 않는다는 원칙 때문). 외부 iframe 은 1단계 수집한다.
+
+## 오픈소스 고지
+requests(Apache-2.0) · urllib3(MIT) · certifi(MPL-2.0) · charset_normalizer(MIT) · idna(BSD-3-Clause) · beautifulsoup4(MIT) · lxml(BSD-3-Clause) ·
+soupsieve(MIT) · PyInstaller(GPL-2.0 with bootloader exception; 생성된 실행 파일에는 영향 없음). 선택 의존성 playwright(Apache-2.0)는 제출본에 포함하지 않는다.
