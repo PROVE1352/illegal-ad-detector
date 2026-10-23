@@ -130,6 +130,7 @@ class PageAnalyzer:
         self.sheet = H.apply_sheet(self.soup, H.sheet_rules(self.soup, page.css_texts))
         self.findings: list[Finding] = []
         self.covered: set[int] = set()
+        self.obf_owned: set[int] = set()   # 난독화 코드를 자기 위치에 이미 붙인 숨김 요소(자손에는 다시 붙이지 않음)
         title = self.soup.title.get_text(" ") if self.soup.title else ""
         h1 = " ".join(h.get_text(" ") for h in self.soup.find_all(["h1", "h2"])[:3])
         self.page_context = f"{title} {h1}"
@@ -420,6 +421,18 @@ class PageAnalyzer:
             code = dominant_official(techs)
             if code and code not in f.official:
                 f.official.append(code)
+            # 숨긴 요소 안의 난독화(JAMO/HOMOGLYPH)는 그 숨긴 요소 위치에 함께 붙인다(요강 예시: span.visually-hidden 의 JAMO).
+            # 자식 요소에 다시 붙이면 같은 요소가 두 위치로 갈라져 한쪽이 오탐이 되므로 _obfuscation_pass 는 이 요소 아래를 건너뛴다.
+            obf_codes, obf_hits, _ = self._obf_codes(text, leaf=not el.find(list(BLOCK_TAGS)))
+            for oc in sorted(obf_codes):
+                if oc not in f.official:
+                    f.official.append(oc)
+                    f.add(f"obfuscation.{oc.lower()}", f"{oc} 난독화 키워드: " +
+                          ", ".join(f"{k}({lv})" for k, w, lv in obf_hits if lv == oc or lv == LEVEL_PLAIN)[:200], 2.5, "hidden")
+                    if oc not in f.techniques:
+                        f.techniques.append(oc)
+            if obf_codes:
+                self.obf_owned.add(id(el))
         for tech, _ in techs:
             if tech not in OFFICIAL_MAP:
                 name = "HIDDEN_" + tech.upper()
@@ -506,6 +519,8 @@ class PageAnalyzer:
             if el.name in SKIP_TAGS or el.name not in TEXT_TAGS:
                 continue
             if el.find_parent(["script", "style", "noscript"]):
+                continue
+            if self.obf_owned and (id(el) in self.obf_owned or any(id(a) in self.obf_owned for a in el.parents)):
                 continue
             text = el.get_text(" ")
             if not text.strip():

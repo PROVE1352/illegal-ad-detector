@@ -66,7 +66,8 @@ uv run pytest -q
   2개 이상의 기법이 중첩 적용된 경우 기법별로 별도 객체 생성"을 허용하며, 채점자가 어느 쪽 라벨을 붙였을지 알 수 없어 한쪽만 내면
   검출 개수(45점)를 잃을 수 있다. 은닉 기법끼리 겹칠 때(opacity:0 + left:-9999px, display:none + color:#fff)는 지배적인 하나만
   낸다(display:none > 화면 밖 위치 > font-size 0 > 글자색=배경색 > opacity). 난독화 기법끼리(JAMO + HOMOGLYPH)는 각각 치환 매칭이
-  성립할 때만 둘 다 낸다.
+  성립할 때만 둘 다 낸다. 숨긴 요소 안에 난독화 문구가 있으면(자식 요소에 있어도) 두 finding 의 location 은 모두 **숨긴 요소**다
+  (요강 예시 f_001: `span.visually-hidden` 에 JAMO). 그 요소 아래 자식에는 난독화 finding 을 따로 만들지 않는다.
 - `result_extra.json` 은 technique `"ETC"` 고정, `extra_finding` 에 우리가 정한 유형 이름(HTML_COMMENT, NOSCRIPT,
   HIDDEN_IFRAME, HIDDEN_VISIBILITY_HIDDEN, SCRIPT_INJECTION, META_REFRESH, SUSPICIOUS_TLD, SHORTENER, MESSENGER,
   ANCHOR_MISMATCH, MASS_EXTERNAL_LINKS, OBFUSCATION_INSERT, DYNAMIC_INJECTION, SCRIPT_DECODED, HIDDEN_EXTERNAL_LINK …)+분류+위험도+점수를 적는다.

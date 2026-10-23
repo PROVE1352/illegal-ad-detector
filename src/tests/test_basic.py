@@ -579,3 +579,21 @@ def test_transparent_external_css_end_to_end(tmp_path):
     finally:
         srv.shutdown()
     assert any("TRANSPARENT" in f.official and f.location == "p.x" for f in res.findings), [(f.location, f.official) for f in res.findings]
+
+
+
+# ---------- B2: 숨김(외부 CSS 클래스) + 자모 분해 → OFFSCREEN 과 JAMO 두 finding, 같은 location ----------
+@pytest.mark.parametrize("html", [
+    '<style>.h-dn{display:none}</style><p class="h-dn">ㅂㅏㅋㅏㄹㅏ ㅌㅗㅌㅗ</p>',
+    '<style>.h-dn{display:none}</style><p class="h-dn"><b>ㅂㅏㅋㅏㄹㅏ ㅌㅗㅌㅗ</b> 추천</p>',
+    '<p class="h-dn" style="position:absolute;left:-9999px">정상 안내 <span>ㅂㅏㅋㅏㄹㅏ ㅌㅗㅌㅗ</span></p>',
+    '<style>.h-dn{display:none}</style><p class="h-dn">ｃａｓｉｎｏ 바카라 보증업체</p>',
+])
+def test_hidden_plus_obfuscation_double_finding_same_location(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    by = {f.location: set(f.official) for f in fs if f.official}
+    assert list(by) == ["p.h-dn"], by
+    codes = by["p.h-dn"]
+    assert "OFFSCREEN" in codes and (codes & {"JAMO", "HOMOGLYPH"}), codes
+    units = {(o["location"], o["technique"]) for o in build_official(fs)}
+    assert len(units) == 2 and all(loc == "p.h-dn" for loc, _ in units)
