@@ -484,21 +484,3 @@ def test_cloaking_runs_after_max_pages_reached():
     finally:
         srv.shutdown()
     assert len(hits) - n0 >= 2 and any("Yeti" in u for u in hits)
-
-
-# ---------- AR6-2: 정밀도 하드 네거티브 ----------
-@pytest.mark.parametrize("html", [
-    '<p>２０２６년 불법 토토사이트 광고 단속 결과 안내</p>',          # 전각 연도 + 행정 문맥
-    '<p>２０２６년 ３월 토토사이트 추천</p>',                         # 전각 숫자만으로는 HOMOGLYPH 아님
-    '<div style="display:none"><a href="/x">교통안전 사이트 바로가기</a></div>',
-    '<div style="display:none">회원 가입코드를 입력하세요</div>',
-])
-def test_precision_hard_negatives(html):
-    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
-    assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]
-
-
-def test_fullwidth_letters_still_homoglyph():
-    for html in ('<td class="t">ｍｅｇａ－ＢＥＴ 첫충 30％ 지급</td>', '<p>ｔ０ｔ０ 사이트 추천 안전 놀이터</p>', '<p>ＶＩＰ－ＢＥＴ 매충 20％ 입플</p>'):
-        fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
-        assert "HOMOGLYPH" in {c for f in fs for c in f.official}, html

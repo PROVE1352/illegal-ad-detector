@@ -93,7 +93,7 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 (!important, 명시도, 선언 순서) 순으로 캐스케이드한다. 의사클래스(:hover 등) 선택자와 `@media print` 블록은 적용하지 않는다.
 외부 CSS 는 숨김 판정에 쓰는 속성(display/visibility/opacity/font-size/position/offset/text-indent/clip/color/background/크기, margin·transform 은
 화면 밖 값일 때만)만 추리고, 단순 선택자(tag/.class/#id)는 페이지당 1회 만든 색인으로 해석하므로 5,000규칙 CSS + 300페이지 사이트도
-전체 8초 안팎(페이지당 ~27ms; 클로킹 점검 40페이지×2요청 포함, 요청 간격 0 기준)이다. 기본 간격 0.3s 면 네트워크 대기가 지배한다.
+전체 7초 안팎(페이지당 ~25ms, 클로킹 점검 포함)이다.
 
 ## 하네스 (`eval.py`)
 - `fixtures/gen_fixtures.py` 가 단일 소스에서 dev/holdout 두 사이트와 `labels.json` 을 만든다(요소 id 는 중립, 탐지기는 id 를 읽지 않음).

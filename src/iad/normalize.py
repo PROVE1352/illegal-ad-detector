@@ -141,8 +141,7 @@ def collapse_spaces(text: str) -> str:
     return re.sub(r"\s+", " ", basic(text)).strip()
 
 
-_FULLWIDTH_LETTER = re.compile("[\uff21-\uff3a\uff41-\uff5a]")
-_FULLWIDTH_DIGIT_WITH_LETTER = re.compile("(?:[A-Za-z\uff21-\uff3a\uff41-\uff5a][\uff10-\uff19]|[\uff10-\uff19][A-Za-z\uff21-\uff3a\uff41-\uff5a])")
+_FULLWIDTH = re.compile("[\uff10-\uff19\uff21-\uff3a\uff41-\uff5a]")
 _CYRILLIC_GREEK = re.compile("[\u0400-\u04ff\u0370-\u03ff]")
 _LATIN = re.compile("[a-zA-Z]")
 _HANGUL = re.compile("[\uac00-\ud7a3]")
@@ -156,8 +155,7 @@ def has_homoglyph_chars(text: str) -> bool:
     """전각 영숫자가 있거나, 한 단어 안에 키릴·그리스 문자가 라틴/한글/숫자와 섞여 있으면(스크립트 혼용) True.
     문장 전체가 키릴인 정상 러시아어 텍스트는 해당하지 않는다."""
     t = text or ""
-    # 전각 영문자는 위장 신호. 전각 숫자(２０２６년)는 한글 IME 에서 흔하므로 라틴/전각 영문자와 붙어 있을 때만(ｔ０ｔ０) 센다
-    if _FULLWIDTH_LETTER.search(t) or _FULLWIDTH_DIGIT_WITH_LETTER.search(t):
+    if _FULLWIDTH.search(t):
         return True
     for tok in _WORD.findall(t):
         if _CYRILLIC_GREEK.search(tok) and (_LATIN.search(tok) or _HANGUL.search(tok) or re.search(r"\d", tok)):
