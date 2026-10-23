@@ -733,3 +733,19 @@ def test_inducement_gate_positive(html, code):
 def test_inducement_gate_negative(html):
     fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
     assert not any(f.official for f in fs), [(f.location, f.official, f.score) for f in fs]
+
+
+# ---------- 조정안 B-②: 한글 음절 안 영문·숫자 시각 치환 ----------
+@pytest.mark.parametrize("text", ["ㅋr지노 추천", "ㅂrㅋrㄹr 코드", "스ㅍ0츠토토 가입", "토Eㅗ 사이트 추천", "ㅌㅗEㅗ 추천", "카지L ㅗ 입장", "안전놀0ㅣ터 추천"])
+def test_korean_leet_homoglyph(text):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body><p>{text}</p></body></html>"), "ex.go.kr")
+    assert "HOMOGLYPH" in {c for f in fs for c in f.official}, (text, [(f.location, f.official) for f in fs])
+    hits = match_keywords_levels(text)
+    assert any(lv == "HOMOGLYPH" for hs in hits.values() for _, _, lv in hs)
+
+
+@pytest.mark.parametrize("text", ["카카오TV 생중계", "e편한세상 입주 안내", "LG전자 서비스센터", "T맵 길안내", "Hi서울 페스티벌", "SK텔레콤 KT LGU+ 요금",
+                                  "CJ대한통운 택배", "A형 독감 주의", "오늘의 TOP10 뉴스", "문의 02-7070-1234", "2026년 10월 1일", "COVID-19 예방접종"])
+def test_korean_leet_negatives(text):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body><p>{text}</p></body></html>"), "ex.go.kr")
+    assert not fs, (text, [(f.location, f.official, f.extra_names) for f in fs])

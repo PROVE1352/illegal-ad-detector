@@ -121,9 +121,38 @@ def _map_homoglyphs(t: str, alt_i: bool = False) -> str:
     return _ALNUM_RUN.sub(repl, t)
 
 
+# 한글 음절 안 영문·숫자 시각 치환(ㅋr지노, ㅂrㅋrㄹr, 스ㅍ0츠토토, 토Eㅗ): 앞뒤 글자가 한글(음절·호환 자모)일 때만 자모로 바꾼다
+KOREAN_LEET = {"r": "ㅏ", "E": "ㅌ", "O": "ㅇ", "o": "ㅇ", "0": "ㅇ", "I": "ㅣ", "l": "ㅣ", "|": "ㅣ", "1": "ㅣ", "L": "ㄴ", "7": "ㄱ",
+               "H": "ㅐ", "T": "ㅜ", "c": "ㄷ", "C": "ㄷ", "2": "ㄹ"}
+_HANGUL_CH = re.compile("[\uac00-\ud7a3\u3131-\u3163]")
+_CONSONANT_CH = re.compile("[\u3131-\u314e]")
+_LEET_CAND = re.compile("[rEOo0Il|1L7HTcC2]")
+
+
+def korean_leet(t: str) -> str:
+    """대소문자가 남아 있는 문자열에서 한글 사이에 낀 라틴/숫자 유사자를 자모로 치환한다(영문 약어·전화번호는 앞뒤가 한글이 아니라 그대로).
+    O/o/0 은 바로 앞이 자음 자모면 모음 ㅗ(스ㅍ0츠→스포츠), 아니면 ㅇ(놀0ㅣ터→놀이터)."""
+    if not _LEET_CAND.search(t) or not _HANGUL_CH.search(t):
+        return t
+    out = list(t)
+    n = len(t)
+    for i, ch in enumerate(t):
+        if ch in KOREAN_LEET:
+            prev_h = i > 0 and bool(_HANGUL_CH.match(t[i - 1]))
+            next_h = i + 1 < n and bool(_HANGUL_CH.match(t[i + 1]))
+            if prev_h or next_h:
+                rep = KOREAN_LEET[ch]
+                if ch in "Oo0" and i > 0 and _CONSONANT_CH.match(out[i - 1]):
+                    rep = "ㅗ"
+                out[i] = rep
+    return "".join(out)
+
+
 def level_homoglyph(text: str, alt_i: bool = False) -> str:
-    """plain + NFKC(전각·호환문자) + 유사문자 치환(HOMOGLYPH 판정용)."""
-    t = _nfkc_keep_jamo(level_plain(text))
+    """plain + NFKC(전각·호환문자) + 유사문자 치환(HOMOGLYPH 판정용). 한글 사이 영문·숫자 시각 치환 후에는 자모를 합성한다."""
+    raw = _strip_noise(text or "")
+    leet = korean_leet(raw)
+    t = _nfkc_keep_jamo(level_plain(compose_jamo(leet) if leet != raw else text))
     t = _strip_noise(t.lower())
     return _map_homoglyphs(t, alt_i)
 
@@ -150,8 +179,10 @@ def has_jamo(text: str) -> bool:
 
 
 def aggressive(text: str, alt_i: bool = False) -> str:
-    """키워드 탐지용 최대 정규화: 자모 합성 → NFKC → 유사문자 치환."""
-    t = unicodedata.normalize("NFKC", level_jamo(text))
+    """키워드 탐지용 최대 정규화: 자모 합성 → NFKC → 한글 사이 시각 치환 → 유사문자 치환."""
+    raw = _strip_noise(text or "")
+    leet = korean_leet(raw)
+    t = unicodedata.normalize("NFKC", level_jamo(compose_jamo(leet) if leet != raw else text))
     t = _strip_noise(t.lower())
     return _map_homoglyphs(t, alt_i)
 
