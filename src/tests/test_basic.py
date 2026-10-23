@@ -517,3 +517,33 @@ def test_overlap_reporting_rules():
     off = build_official(fs)
     units = {(o["location"], o["technique"]) for o in off}
     assert ("span.c", "TRANSPARENT") in units and ("span.c", "JAMO") in units and len(off) == 6
+
+
+# ---------- AR9: OFFSCREEN 일반형 ----------
+@pytest.mark.parametrize("html,code", [
+    ('<span style="position:absolute;left:12000px">토토사이트 추천</span>', "OFFSCREEN"),
+    ('<span style="position:fixed;top:99999px">토토사이트 추천</span>', "OFFSCREEN"),
+    ('<div style="overflow:hidden;height:100px;position:relative"><p style="position:absolute;top:300px">토토사이트 추천</p></div>', "OFFSCREEN"),
+    ('<span style="position:absolute;clip-path:inset(100%)">토토사이트 추천</span>', "OFFSCREEN"),
+    ('<span style="position:absolute;clip:rect(0,0,0,0)">토토사이트 추천</span>', "OFFSCREEN"),
+    ('<span style="position:absolute;width:1px;height:1px;overflow:hidden">토토사이트 추천</span>', "OFFSCREEN"),
+    ('<div style="transform:scale(0)">토토사이트 추천</div>', "OFFSCREEN"),
+    ('<div style="max-height:0;overflow:hidden">토토사이트 추천</div>', "OFFSCREEN"),
+    ('<div hidden>토토사이트 추천</div>', "OFFSCREEN"),
+    ('<style>.pos{position:absolute}.far{left:-9999px}</style><span class="pos far">토토사이트 추천</span>', "OFFSCREEN"),
+])
+def test_offscreen_general_forms(html, code):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert code in {c for f in fs for c in f.official}, [(f.location, f.official) for f in fs]
+
+
+@pytest.mark.parametrize("html", [
+    '<span style="position:absolute;left:300px">토토사이트 광고 단속 안내</span>',                       # 화면 안
+    '<div style="overflow:hidden;height:500px;position:relative"><p style="position:absolute;top:100px">토토사이트 단속 안내</p></div>',
+    '<div style="max-height:0;overflow:hidden"><p>대관료: 시간당 2만원</p></div>',
+    '<span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden">본문 바로가기</span>',
+    '<div hidden><a href="/about">기관소개</a></div>',
+])
+def test_offscreen_general_hard_negatives(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]

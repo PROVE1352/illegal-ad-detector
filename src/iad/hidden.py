@@ -37,6 +37,7 @@ RELEVANT_PROPS = {
     "display", "visibility", "opacity", "font-size", "font", "position", "left", "top", "right", "bottom", "inset",
     "text-indent", "transform", "translate", "margin", "margin-left", "margin-top", "margin-right", "margin-bottom",
     "clip", "clip-path", "color", "background", "background-color", "background-image", "width", "height", "overflow",
+    "overflow-x", "overflow-y", "max-height", "max-width", "scale",
 }
 MAX_RULES = 20000
 NEAR_TOLERANCE = 10
@@ -265,8 +266,9 @@ def _may_hide(prop: str, val: str) -> bool:
     if prop not in RELEVANT_PROPS:
         return False
     # 덮어쓰기(.a{display:none} .a.on{display:block})가 흔한 속성은 값과 무관하게 전부 남긴다(캐스케이드 정확도)
-    if prop in ("color", "background", "background-color", "background-image", "position", "overflow", "display",
-                "visibility", "opacity", "font-size", "font", "left", "top", "right", "bottom", "inset", "text-indent"):
+    if prop in ("color", "background", "background-color", "background-image", "position", "overflow", "overflow-x",
+                "overflow-y", "display", "visibility", "opacity", "font-size", "font", "left", "top", "right", "bottom",
+                "inset", "text-indent", "height", "width", "max-height", "max-width", "scale"):
         return True
     # margin/transform 은 규칙 수가 매우 많고 숨김 용도는 드물어 화면 밖(≤-500px) 값일 때만 남긴다
     if prop in ("margin", "margin-left", "margin-top", "margin-right", "margin-bottom", "transform", "translate"):
@@ -436,6 +438,8 @@ def _offscreen_reason(st: dict[str, str]) -> str | None:
             v = _px(st.get(k))
             if v is not None and v <= -500:
                 return f"position:{pos}; {k}:{st[k]}"
+            if v is not None and v >= 5000 and pos in ("absolute", "fixed"):
+                return f"position:{pos}; {k}:{st[k]} (뷰포트 밖 양수)"
         if st.get("inset"):
             if any(v <= -500 for v in _lengths(st["inset"])):
                 return f"position:{pos}; inset:{st['inset']}"
@@ -454,6 +458,29 @@ def _offscreen_reason(st: dict[str, str]) -> str | None:
             return f"{k}:{st[k]}"
     if st.get("margin") and any(v <= -500 for v in _lengths(st["margin"])):
         return f"margin:{st['margin']}"
+    return None
+
+
+def _outside_overflow_parent(el: Tag, st: dict[str, str], sheet: dict[int, dict[str, str]]) -> str | None:
+    """position:absolute 요소가 overflow:hidden 인 조상 상자(명시적 크기) 밖에 놓이면 화면 밖."""
+    if st.get("position") not in ("absolute", "fixed"):
+        return None
+    top, left = _px(st.get("top")), _px(st.get("left"))
+    if (top is None or top < 50) and (left is None or left < 50):
+        return None
+    cur = el.parent
+    hops = 0
+    while isinstance(cur, Tag) and cur.name not in ("body", "html", "[document]") and hops < 6:
+        pst = effective_style(cur, sheet)
+        if pst.get("overflow") == "hidden" or pst.get("overflow-y") == "hidden" or pst.get("overflow-x") == "hidden":
+            h, w = _px(pst.get("height") or pst.get("max-height")), _px(pst.get("width") or pst.get("max-width"))
+            if top is not None and h is not None and top >= h:
+                return f"overflow:hidden 상자(height:{h:g}px) 밖 top:{st.get('top')}"
+            if left is not None and w is not None and left >= w:
+                return f"overflow:hidden 상자(width:{w:g}px) 밖 left:{st.get('left')}"
+            return None
+        cur = cur.parent
+        hops += 1
     return None
 
 
@@ -480,11 +507,19 @@ def hidden_techniques(el: Tag, sheet: dict[int, dict[str, str]]) -> list[tuple[s
         fs = fs / 100 * 16          # 부모 16px 가정: 0%~6% ≈ 0~1px
     if fs is not None and 0 <= fs <= 1:
         out.append(("font_size_zero", f"font-size:{fs_raw}"))
-    reason = _offscreen_reason(st)
+    reason = _offscreen_reason(st) or _outside_overflow_parent(el, st, sheet)
     if reason:
         out.append(("offscreen", reason))
     w = _px(st.get("width") or el.get("width"))
     h = _px(st.get("height") or el.get("height"))
+    if st.get("overflow") == "hidden":
+        mh, mw = _px(st.get("max-height")), _px(st.get("max-width"))
+        if (mh is not None and 0 <= mh <= 1) or (mw is not None and 0 <= mw <= 1):
+            out.append(("tiny_size", f"max-height/max-width 0 + overflow:hidden"))
+    tf = st.get("transform") or ""
+    m = re.search(r"scale(?:3d|x|y)?\(\s*0(?:\.0+)?(?:\s*,\s*0(?:\.0+)?)*\s*\)", tf)
+    if m or st.get("scale") in ("0", "0 0"):
+        out.append(("tiny_size", f"transform:{m.group(0) if m else 'scale:0'}"))
     if (w is not None and 0 <= w <= 1) or (h is not None and 0 <= h <= 1):
         if el.name == "iframe":
             out.append(("iframe_1x1", f"iframe 크기 {w}x{h}"))
@@ -505,8 +540,8 @@ def hidden_techniques(el: Tag, sheet: dict[int, dict[str, str]]) -> list[tuple[s
             bg = background_of(el, sheet)
             if bg is not None and colors_close(color, bg):
                 out.append(("color_match", f"글자색 #{color} ≈ 배경색 #{bg}" if color != bg else f"글자색 #{color} = 배경색 #{bg}"))
-    if el.has_attr("hidden"):
-        out.append(("hidden_attr", "hidden 속성"))
+    if el.has_attr("hidden") and st.get("display") not in ("block", "inline", "flex", "inline-block", "grid"):
+        out.append(("hidden_attribute", "hidden 속성(UA 스타일 display:none)"))
     if el.get("aria-hidden") == "true" and el.name in ("div", "span", "p", "a"):
         out.append(("hidden_attr", "aria-hidden=true"))
     if el.name == "marquee":

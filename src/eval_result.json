@@ -1,21 +1,21 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 12:34:02",
+  "timestamp": "2026-10-23 12:35:18",
   "depth": 3,
   "max_pages": 300,
-  "port": 59151
+  "port": 59840
  },
  "results": [
   {
    "set": "dev",
-   "entry_url": "http://127.0.0.1:59151/dev/index.html",
-   "pages_crawled": 29,
-   "elapsed_sec": 0.21,
-   "tool_elapsed_sec": 0.208872,
+   "entry_url": "http://127.0.0.1:59840/dev/index.html",
+   "pages_crawled": 30,
+   "elapsed_sec": 0.22,
+   "tool_elapsed_sec": 0.21434,
    "official": {
-    "gold": 42,
-    "reported_units": 42,
-    "tp": 42,
+    "gold": 49,
+    "reported_units": 49,
+    "tp": 49,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
@@ -37,8 +37,8 @@
       "recall": 1.0
      },
      "OFFSCREEN": {
-      "gold": 13,
-      "hit": 13,
+      "gold": 20,
+      "hit": 20,
       "recall": 1.0
      }
     },
@@ -47,26 +47,26 @@
     "unresolved": []
    },
    "extra": {
-    "gold": 17,
-    "reported": 17,
-    "hit": 17,
+    "gold": 16,
+    "reported": 16,
+    "hit": 16,
     "recall": 1.0,
     "false_positives": [],
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_0skma_hu"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_oipygtdn"
   },
   {
    "set": "holdout",
-   "entry_url": "http://127.0.0.1:59151/holdout/index.html",
-   "pages_crawled": 29,
-   "elapsed_sec": 0.15,
-   "tool_elapsed_sec": 0.144936,
+   "entry_url": "http://127.0.0.1:59840/holdout/index.html",
+   "pages_crawled": 30,
+   "elapsed_sec": 0.16,
+   "tool_elapsed_sec": 0.151221,
    "official": {
-    "gold": 42,
-    "reported_units": 42,
-    "tp": 42,
+    "gold": 49,
+    "reported_units": 49,
+    "tp": 49,
     "fp": 0,
     "precision(정확도)": 1.0,
     "recall": 1.0,
@@ -88,8 +88,8 @@
       "recall": 1.0
      },
      "OFFSCREEN": {
-      "gold": 13,
-      "hit": 13,
+      "gold": 20,
+      "hit": 20,
       "recall": 1.0
      }
     },
@@ -98,15 +98,15 @@
     "unresolved": []
    },
    "extra": {
-    "gold": 17,
-    "reported": 17,
-    "hit": 17,
+    "gold": 16,
+    "reported": 16,
+    "hit": 16,
     "recall": 1.0,
     "false_positives": [],
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_pt2y_qkb"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_hccyxaj6"
   }
  ]
 }

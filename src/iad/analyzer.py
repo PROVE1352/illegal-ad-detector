@@ -29,16 +29,16 @@ BLOCK_TAGS = {"p", "div", "li", "tr", "td", "th", "table", "ul", "ol", "h1", "h2
 CONTAINER_TAGS = {"div", "td", "article", "section", "li", "dd", "blockquote", "p", "body"}
 HIDDEN_WEIGHT = {
     "display_none": 2.5, "visibility_hidden": 2.5, "opacity_zero": 2.5, "font_size_zero": 2.5, "offscreen": 2.5,
-    "tiny_size": 2.5, "iframe_1x1": 3, "color_match": 2.5, "hidden_attr": 2.5, "marquee": 1.5, "noscript": 2,
+    "tiny_size": 2.5, "iframe_1x1": 3, "color_match": 2.5, "hidden_attr": 2.5, "hidden_attribute": 2.5, "marquee": 1.5, "noscript": 2,
     "html_comment": 2.5,
 }
 # 요강 4종 매핑. 요강: TRANSPARENT=배경색 동일·opacity:0·color:transparent, OFFSCREEN=font-size 0~1px·position 밖·display:none
 OFFICIAL_MAP = {
-    "display_none": "OFFSCREEN", "font_size_zero": "OFFSCREEN", "offscreen": "OFFSCREEN",
-    "color_match": "TRANSPARENT", "opacity_zero": "TRANSPARENT",
+    "display_none": "OFFSCREEN", "hidden_attribute": "OFFSCREEN", "font_size_zero": "OFFSCREEN", "offscreen": "OFFSCREEN",
+    "tiny_size": "OFFSCREEN", "color_match": "TRANSPARENT", "opacity_zero": "TRANSPARENT",
 }
-# 은닉 기법이 겹칠 때(display:none + color:#fff 등) 보고할 하나를 고르는 지배 순서: 렌더링 자체를 없애는 것 > 화면 밖 > 글자 크기 0 > 투명
-HIDE_DOMINANCE = ["display_none", "offscreen", "font_size_zero", "color_match", "opacity_zero"]
+# 은닉 기법이 겹칠 때(display:none + color:#fff 등) 보고할 하나를 고르는 지배 순서: 렌더링 자체를 없애는 것 > 화면 밖 > 글자 크기 0 > 잘림 > 투명
+HIDE_DOMINANCE = ["display_none", "hidden_attribute", "offscreen", "font_size_zero", "tiny_size", "color_match", "opacity_zero"]
 
 
 def dominant_official(techs: list[tuple[str, str]]) -> str | None:

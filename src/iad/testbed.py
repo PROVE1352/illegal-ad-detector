@@ -296,9 +296,9 @@ class Site:
             [])
         for eid, name, cat in ((x1, "HTML_COMMENT", "도박"), (x2, "NOSCRIPT", "도박"), (x3, "HIDDEN_IFRAME", "기타"),
                                (x4, "HIDDEN_MARQUEE", "도박"), (x5, "HIDDEN_VISIBILITY_HIDDEN", "성인"),
-                               (x6, "HIDDEN_HIDDEN_ATTR", "불법금융"), (x7, "SCRIPT_INJECTION", "도박"),
-                               (x8, "SCRIPT_INJECTION", "도박")):
+                               (x7, "SCRIPT_INJECTION", "도박"), (x8, "SCRIPT_INJECTION", "도박")):
             self.label("post/post_library.html", eid, "ETC", cat, extra=name)
+        self.label("post/post_library.html", x6, "OFFSCREEN", "불법금융", note="hidden 속성 = UA display:none")
 
         y1, y2, y3, y4, y5, y6 = (self.nid() for _ in range(6))
         add("post/post_culture.html", "문화센터 가을학기 수강생 모집",
@@ -341,6 +341,24 @@ class Site:
             f'<p id="{q4}">{"Ꮯasino 라이브" if not v else "ꭲoto 사이트"}</p>', ["감사합니다"])
         for eid in (q1, q2, q3, q4):
             self.label("post/post_r2.html", eid, "HOMOGLYPH", "도박")
+
+        # 레드팀 R2: OFFSCREEN 일반형 — 뷰포트 밖 양수, 부모 overflow 밖, clip-path, 1×1 overflow, scale(0), max-height 0 + 하드 네거티브
+        s1, s2, s3, s4, s5, s6 = (self.nid() for _ in range(6))
+        add("post/post_r3.html", "체육시설 이용 안내",
+            f'<p>체육관 대관 신청은 매월 1일부터 접수합니다.</p>'
+            f'<div class="acc" style="max-height:0;overflow:hidden"><p>대관료: 시간당 2만원 (아코디언 접힘 상태 정상 내용)</p></div>'
+            f'<span class="sr-only">본문 바로가기</span>'
+            f'<div style="position:relative;overflow:hidden;height:120px;width:400px"><p>이용 시간 06:00~22:00</p>'
+            f'<p id="{s1}" style="position:absolute;top:{"300px" if not v else "999px"};left:0">{"토토사이트 안전놀이터 추천" if not v else "메이저놀이터 검증업체 추천"}</p></div>'
+            f'<span id="{s2}" style="position:absolute;{"left:12000px" if not v else "top:99999px"}">{"바카라 온라인카지노 첫충" if not v else "라이브카지노 슬롯사이트 매충"}</span>'
+            f'<span id="{s3}" style="{"clip-path:inset(100%)" if not v else "clip:rect(0,0,0,0)"};position:absolute">{"출장안마 출장마사지 24시" if not v else "조건만남 애인대행 전국"}</span>'
+            f'<span id="{s4}" style="position:absolute;width:1px;height:1px;overflow:hidden">{"무직자대출 당일대출 승인" if not v else "일수대출 개인돈 월변"}</span>'
+            f'<div id="{s5}" style="{"transform:scale(0)" if not v else "max-height:0;overflow:hidden"}">{"카드깡 소액결제현금화" if not v else "상품권현금화 정보이용료현금화"}</div>'
+            f'<div id="{s6}" hidden>{"꽁머니 가입머니 토토사이트" if not v else "입플 첫충 메이저사이트"}</div>'
+            f'<div hidden><a href="about.html">기관소개</a> <a href="index.html">공지</a></div>',
+            ["감사합니다"])
+        for eid, cat in ((s1, "도박"), (s2, "도박"), (s3, "성인"), (s4, "불법금융"), (s5, "불법금융"), (s6, "도박")):
+            self.label("post/post_r3.html", eid, "OFFSCREEN", cat)
 
         # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
         k1 = self.nid()
