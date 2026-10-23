@@ -143,8 +143,9 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 
 브라우저 단계(P1-2, 기본 켬, `--no-browser`/GUI 체크로 끔): OS 에 이미 설치된 Edge/Chrome 을 `--headless=new --dump-dom --virtual-time-budget=5000`
 으로 띄워(추가 의존성 없음, 임시 프로필, 페이지당 15초·단계 5분·남은 시간 예산 안) 인라인 스크립트에 document.write/innerHTML/appendChild/
-eval/atob 등 DOM 주입 흔적이 있는 최상위 페이지(최대 30쪽)만 JS 실행 후 DOM 을 한 번 더 분석한다. **정적 HTML 에 없던(선택자가 안 풀리거나 내용이
-달라진) 요소만 ETC `DYNAMIC_INJECTION` 으로 result_extra 에 넣고 result.json 에는 넣지 않는다** — 채점자의 location 은 수집한 HTML 기준으로 풀릴
+eval/atob 등 DOM 주입 흔적이 있는 최상위 페이지(최대 30쪽)만 JS 실행 후 DOM 을 한 번 더 분석한다. **정적 HTML 에 없던 요소만 ETC `DYNAMIC_INJECTION` 으로 result_extra 에 넣고 result.json 에는 넣지 않는다**(선택자가 정적 DOM 에서
+풀리면 그 요소의 내용으로, 안 풀리면 — Chrome 의 `<tbody>` 삽입·중첩 수선으로 경로가 달라질 수 있으므로 — 정적 HTML 원문·텍스트에 근거 문장과 링크가
+있는지로 '이미 있던 것'을 가려내고, 숨긴 메뉴의 외부 링크만으로는 올리지 않는다; 실사이트 10쪽은 전부 의심 스크립트 대상이었고 Chrome 으로 돌려 추가 0건, 쪽당 1.5초) — 채점자의 location 은 수집한 HTML 기준으로 풀릴
 가능성이 높고, 4종은 확신 높은 것만 넣는다는 원칙 때문. 탐색 순서는 IAD_BROWSER 환경변수 → Windows 레지스트리 App Paths(msedge/chrome) →
 Program Files·LOCALAPPDATA 표준 경로 → PATH. 정책 HeadlessModeEnabled=0 이면 건너뛰고, 실행 파일이 없거나 호출이 실패·타임아웃이면 정적 결과만
 남긴다(Windows 실측은 하지 않았으므로 "실패하면 정적"이 설계 전제). 하네스(eval.py)는 결정적 비교를 위해 browser=False 로 돌리고, 브라우저 경로는

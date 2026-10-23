@@ -1083,3 +1083,20 @@ def test_browser_stage_live_chrome(tmp_path, monkeypatch):
     finally:
         srv.shutdown()
     assert out and "DYNAMIC_INJECTION" in out[0].extra_names and not out[0].official, note
+
+
+def test_browser_stage_dom_normalization_is_not_injection(tmp_path, monkeypatch):
+    """Chrome 이 <tbody> 를 끼워 경로가 달라져도 정적 HTML 에 이미 있는 내용은 동적 주입이 아니다."""
+    from iad import browser as B
+    static = ('<html><head><meta charset="utf-8"><style>.t{color:#fff;background:#fff}</style></head><body>'
+              '<table><tr><td class="t">토토사이트 추천 안전놀이터 <a href="http://kr-bet777.top">바로가기</a></td></tr></table>'
+              '<div id="x"></div><script>document.getElementById("x").innerHTML = "<b>공지</b>";</script></body></html>')
+    rendered = static.replace("<table><tr>", "<table><tbody><tr>").replace("</tr></table>", "</tr></tbody></table>").replace('<div id="x"></div>', '<div id="x"><b>공지</b></div>')
+    fake = tmp_path / "fb.py"
+    fake.write_text(f"import sys\nsys.stdout.buffer.write({rendered!r}.encode('utf-8'))\n", encoding="utf-8")
+    monkeypatch.setenv("IAD_BROWSER", str(fake))
+    page = Page(url="http://ex.go.kr/t.html", html=static)
+    static_fs = analyze_page(page, "ex.go.kr")
+    assert any("TRANSPARENT" in f.official for f in static_fs)
+    out, note = B.browser_stage([page], static_fs, "ex.go.kr", lambda: 60.0, lambda m: None)
+    assert out == [], [(f.location, f.extra_names, f.evidence_text) for f in out]

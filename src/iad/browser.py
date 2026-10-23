@@ -153,17 +153,30 @@ def is_suspicious_page(html: str) -> bool:
     return any(SUSPICIOUS_JS.search(m.group(1)) for m in _INLINE_SCRIPT.finditer(html or ""))
 
 
-def _static_has(static_soup: BeautifulSoup, location: str, evidence_text: str) -> bool:
-    """정적 DOM 에 같은 위치·같은 내용이 이미 있으면 True(정적 분석이 이미 판단한 요소이므로 다시 올리지 않는다)."""
+def _norm(t: str) -> str:
+    return re.sub(r"\s+", " ", t or "").strip()
+
+
+def _static_has(static_soup: BeautifulSoup, static_norm: str, location: str, evidence_text: str, links: list[str]) -> bool:
+    """정적 DOM 에 같은 내용이 이미 있으면 True(정적 분석이 이미 판단한 요소이므로 다시 올리지 않는다).
+
+    1) location 이 정적 DOM 에서 풀리면 그 요소의 텍스트/HTML 에 evidence_text 가 있는지 본다.
+    2) 안 풀리면(Chrome 이 <tbody> 삽입·잘못된 중첩 수선으로 경로가 달라진 경우) 정적 HTML 전체에 evidence_text 와 링크 href 가 모두 있는지로 판단한다.
+       내용이 정말 없을 때만 '동적 주입'이다."""
+    want = _norm(evidence_text)[:80]
     try:
         el = static_soup.select_one(location) if location else None
     except Exception:
-        return False
-    if el is None:
-        return False
-    want = re.sub(r"\s+", " ", evidence_text or "").strip()[:80]
-    have = re.sub(r"\s+", " ", el.get_text(" ") + " " + str(el)[:2000])
-    return not want or want in have
+        el = None
+    if el is not None:
+        have = _norm(el.get_text(" ") + " " + str(el)[:2000])
+        if not want or want in have:
+            return True
+    text_present = bool(want) and want in static_norm
+    links_present = bool(links) and all(_norm(u) in static_norm for u in links)
+    if want and links:
+        return text_present and links_present
+    return text_present or links_present
 
 
 def browser_stage(pages: list[Page], findings: list[Finding], base_host: str, remaining: Callable[[], float],
@@ -209,9 +222,16 @@ def browser_stage(pages: list[Page], findings: list[Finding], base_host: str, re
         if not rendered:
             continue
         static_soup = BeautifulSoup(p.html, "lxml")
+        static_norm = _norm(p.html + " " + static_soup.get_text(" "))   # HTML 원문 + 태그를 뺀 텍스트(태그 사이로 끊긴 문장도 비교)
         added = 0
         for f in rendered:
-            if (f.page_url, f.location) in known or _static_has(static_soup, f.location, f.evidence_text):
+            if (f.page_url, f.location) in known or _static_has(static_soup, static_norm, f.location, f.evidence_text, f.links):
+                continue
+            # 숨긴 메뉴의 외부 링크(hidden_external)만으로는 주입 근거가 약하다(JS 로 만든 내비게이션). 키워드(≥2.0) 또는 다른 링크 규칙이 있어야 한다.
+            strong = any(e.group == "keyword" and e.weight >= 2.0 for e in f.evidence) or \
+                any(e.group == "link" and e.rule != "link.hidden_external" for e in f.evidence) or \
+                any(e.group == "script" for e in f.evidence)
+            if not strong:
                 continue
             names = [*f.official, *f.extra_names]
             f.official = []
