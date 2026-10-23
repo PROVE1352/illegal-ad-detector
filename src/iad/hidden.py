@@ -420,6 +420,15 @@ def _bg_from_shorthand(v: str | None) -> str | None:
     return None
 
 
+def _font_shorthand_size(font: str) -> str | None:
+    """font: [style weight] size[/line-height] family → size. 'font:0/0 a' 같은 단위 없는 0 도 잡는다."""
+    for tok in font.split():
+        m = re.match(r"^(\d+(?:\.\d+)?)(px|pt|em|rem|%)?(?:/[\w.%]+)?$", tok)
+        if m and (m.group(2) or float(m.group(1)) == 0):
+            return m.group(1) + (m.group(2) or "")
+    return None
+
+
 def _offscreen_reason(st: dict[str, str]) -> str | None:
     pos = st.get("position")
     if pos in ("absolute", "fixed", "relative", "sticky"):
@@ -465,9 +474,10 @@ def hidden_techniques(el: Tag, sheet: dict[int, dict[str, str]]) -> list[tuple[s
             out.append(("opacity_zero", f"opacity:{op_raw}"))
     fs_raw = st.get("font-size")
     if not fs_raw and st.get("font"):
-        m = re.search(r"(?<![\w.-])(\d+(?:\.\d+)?(?:px|pt|em|rem))", st["font"])
-        fs_raw = m.group(1) if m else None
-    fs = _px(fs_raw)
+        fs_raw = _font_shorthand_size(st["font"])
+    fs = _px(fs_raw, allow_pct=True)
+    if fs is not None and fs_raw and "%" in fs_raw:
+        fs = fs / 100 * 16          # 부모 16px 가정: 0%~6% ≈ 0~1px
     if fs is not None and 0 <= fs <= 1:
         out.append(("font_size_zero", f"font-size:{fs_raw}"))
     reason = _offscreen_reason(st)

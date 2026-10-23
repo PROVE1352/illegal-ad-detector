@@ -474,6 +474,16 @@ class PageAnalyzer:
                 codes.add("JAMO")
         return codes, allhits, cats
 
+    def _obf_codes_nocho(self, text: str, leaf: bool) -> set[str]:
+        codes: set[str] = set()
+        for cat, hits in match_keywords_levels(text, chosung=False).items():
+            for kw, w, lv in hits:
+                if w >= 1.0 and lv in ("JAMO", "HOMOGLYPH"):
+                    codes.add(lv)
+        if leaf and has_composable_jamo(text):
+            codes.add("JAMO")
+        return codes
+
     def _obfuscation_pass(self) -> None:
         """HOMOGLYPH/JAMO: 난독화 키워드를 품은 '가장 안쪽' 요소를 위치로 잡는다(숨김 여부 무관)."""
         body = self.soup.body or self.soup
@@ -492,6 +502,13 @@ class PageAnalyzer:
             codes, hits, cats = self._obf_codes(text, leaf)
             if not codes:
                 continue
+            if "JAMO" in codes and sum(w for _, w in match_whitelist(text, window=ADMIN_WINDOW)) <= -3:
+                # 초성 퀴즈·한글 교육 자료: 초성 축약만으로 얻은 JAMO 는 인정하지 않는다
+                codes_wo = self._obf_codes_nocho(text, leaf)
+                if "JAMO" not in codes_wo:
+                    codes.discard("JAMO")
+                    if not codes:
+                        continue
             # 자식 요소가 같은 코드를 모두 설명하면 자식에게 맡긴다(가장 안쪽 요소 선택)
             child_codes: set[str] = set()
             for ch in el.find_all(True, recursive=False):

@@ -313,6 +313,23 @@ class Site:
                                (y4, "MESSENGER", "도박"), (y5, "OBFUSCATION_INSERT", "도박"), (y6, "MASS_EXTERNAL_LINKS", "기타")):
             self.label("post/post_culture.html", eid, "ETC", cat, extra=name)
 
+        # 레드팀 R1 약점: font-size 0%·font 단축, 초성 축약 JAMO, 평문 키워드 없는 키릴·그리스·leet HOMOGLYPH + 하드 네거티브
+        r1, r2, r3, r4, r5, r6, r7 = (self.nid() for _ in range(7))
+        add("post/post_r1.html", "민원실 운영시간 변경 안내",
+            f'<p>11월부터 민원실 운영시간이 09:00~18:00 으로 변경됩니다.</p>'
+            f'<span id="{r1}" style="{"font-size:0%" if not v else "font:0/0 a"}">{"토토사이트 안전놀이터 가입코드" if not v else "메이저놀이터 먹튀검증 가입머니"}</span>'
+            f'<p id="{r2}">{"ㅋㅈㄴ ㅂㅋㄹ 추천 코드 777" if not v else "ㅇㅈㄴㅇㅌ ㅁㅌㄱㅈ 완료 코드 999"}</p>'
+            f'<p id="{r3}">{"ㅌㅌ 사이트 가입 문의" if not v else "ㅌㅌ 보너스 코드 문의"}</p>'
+            f'<p id="{r4}">{"т0т0 사이트 입장" if not v else "cas1no 사이트 입장"}</p>'
+            f'<p id="{r5}">{"βaccarat 라이브 입장" if not v else "ѕlоt 머신 체험"}</p>'
+            f'<p>러시아 자매도시 소식: {"Добро пожаловать в Москву" if not v else "Казино Москва закрыто, туризм 2026"}</p>'          # 정상 키릴 문장
+            f'<p>한글교실: 자음 ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ, 모음 ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣ</p>'                         # 자모 교육 자료
+            f'<p>초성 퀴즈: {"ㅋㅈㄴ" if not v else "ㅂㅋㄹ"} (정답은 다음 주)</p>'                                  # 초성 퀴즈
+            f'<p>상담 문의 1577-{"7070" if not v else "0101"}, 시간 slot 은 선착순</p>',
+            ["ㅊㅊ 감사합니다 ㅋㅋ", "ㄱㅅ ㄱㅅ"], head="")
+        for eid, code in ((r1, "OFFSCREEN"), (r2, "JAMO"), (r3, "JAMO"), (r4, "HOMOGLYPH"), (r5, "HOMOGLYPH")):
+            self.label("post/post_r1.html", eid, code, "도박")
+
         # 클로킹: 일반 UA 에는 정상, 봇 UA/네이버 Referer 에는 숨김 링크 뭉치 (eval 서버가 .bot 파일로 응답)
         k1 = self.nid()
         normal_body = "<p>시민 제안 공모를 안내합니다. 접수: 10/20~11/5</p>"

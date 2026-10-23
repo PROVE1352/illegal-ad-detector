@@ -428,3 +428,28 @@ def test_large_stylesheet_is_fast_and_correct():
     assert time.monotonic() - t0 < 0.5
     assert "display_none" in [t for t, _ in H.hidden_techniques(soup.find("span"), sheet)]
     assert not H.hidden_techniques(soup.find("div"), sheet)
+
+
+# ---------- AR6: 레드팀 R1 약점(font-size 0%·초성 축약·단독 유사문자) ----------
+@pytest.mark.parametrize("html,want", [
+    ('<span style="font-size:0%">토토사이트 추천</span>', "OFFSCREEN"), ('<span style="font:0/0 a">토토사이트 추천</span>', "OFFSCREEN"),
+    ('<span style="font-size:5%">토토사이트 추천</span>', "OFFSCREEN"),
+    ('<p>ㅌㅌ 사이트 추천</p>', "JAMO"), ('<p>ㅋㅈㄴ 보너스 코드</p>', "JAMO"), ('<p>ㅂㅋㄹ 추천</p>', "JAMO"),
+    ('<p>ㅇㅈㄴㅇㅌ 가입</p>', "JAMO"), ('<p>ㅁㅌㄱㅈ 완료</p>', "JAMO"), ('<p>ㅋㅈㄴ</p>', "JAMO"),
+    ('<p>саsino 추천</p>', "HOMOGLYPH"), ('<p>т0т0 사이트</p>', "HOMOGLYPH"), ('<p>cas1no 입장</p>', "HOMOGLYPH"),
+    ('<p>βaccarat</p>', "HOMOGLYPH"), ('<p>ｂet365 입장</p>', "HOMOGLYPH"), ('<p>ѕlоt 머신</p>', "HOMOGLYPH"), ('<p>s1ot 머신</p>', "HOMOGLYPH"),
+])
+def test_r1_weak_categories_detected(html, want):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert want in {c for f in fs for c in f.official}, [(f.location, f.official) for f in fs]
+
+
+@pytest.mark.parametrize("html", [
+    '<span style="font-size:80%">토토사이트 광고 신고 안내 단속</span>', '<p>ㅌㅌ 재밌다</p>', '<p>ㅋㅋㅋ ㅎㅎ ㄱㄱ ㅊㅊ 감사</p>',
+    '<p>한글 자음: ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ</p>', '<p>초성 퀴즈 3번: ㅋㅈㄴ (힌트: 도박장)</p>',
+    '<p>Добро пожаловать в Москву</p>', '<p>Казино Москва 2026 туризм</p>', '<p>문의 02-7070-1234, 1577-0101</p>',
+    '<p>time slot 10:00</p>', '<p>2026년 10월 1일 (３월부터)</p>', '<div style="display:none">Available slots: 10:00</div>',
+])
+def test_r1_hard_negatives(html):
+    fs = analyze_page(Page(url="http://ex.go.kr/p", html=f"<html><body>{html}</body></html>"), "ex.go.kr")
+    assert not any(f.official for f in fs), [(f.location, f.official) for f in fs]

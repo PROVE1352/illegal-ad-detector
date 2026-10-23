@@ -14,10 +14,19 @@ _JONG_IDX = {c: i for i, c in enumerate(JONG) if c}
 
 # 유사문자(homoglyph) → 기본 라틴/숫자
 HOMOGLYPHS = {
-    "0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", "$": "s", "|": "l",
-    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y", "к": "k", "і": "i", "ѕ": "s",
-    "ο": "o", "α": "a", "ε": "e", "ι": "i", "ν": "v", "τ": "t",
+    "0": "o", "1": "l", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b", "9": "g", "2": "z", "@": "a", "$": "s", "|": "l",
+    # 키릴
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y", "к": "k", "і": "i", "ѕ": "s", "т": "t",
+    "в": "b", "н": "h", "м": "m", "ѵ": "v", "ј": "j", "ԁ": "d", "ԛ": "q", "ԝ": "w", "ѡ": "w", "ԍ": "g", "ғ": "f",
+    "ё": "e", "ї": "i", "ӏ": "l", "һ": "h", "ԛ": "q", "ԝ": "w",
+    # 그리스
+    "ο": "o", "α": "a", "ε": "e", "ι": "i", "ν": "v", "τ": "t", "β": "b", "κ": "k", "ρ": "p", "υ": "u", "χ": "x",
+    "μ": "u", "η": "n", "ω": "w", "γ": "y", "ζ": "z",
+    # 라틴 확장
+    "ı": "i", "ł": "l", "ø": "o", "ß": "b", "ſ": "s", "đ": "d", "ƅ": "b", "ɡ": "g", "ɑ": "a", "ɩ": "i", "ɴ": "n",
 }
+# 숫자 1/|/! 은 l 과 i 둘 다로 읽힐 수 있어(cas1no, s1ot) 대체 변형을 하나 더 만든다
+_ALT_I = {"1": "i", "|": "i", "!": "i", "l": "l"}
 
 _ZERO_WIDTH = re.compile("[​‌‍⁠﻿­͏ᅟᅠㅤ]")
 _EMOJI = re.compile(
@@ -71,25 +80,33 @@ def level_jamo(text: str) -> str:
     return compose_jamo(level_plain(text))
 
 
-_DIGIT_HOMO = {"0", "1", "3", "4", "5", "7"}
-_ALNUM_RUN = re.compile(r"[0-9a-z@$|\u0400-\u04ff\u0370-\u03ff]+")
+_DIGIT_HOMO = {"0", "1", "2", "3", "4", "5", "7", "8", "9"}
+_ALNUM_RUN = re.compile(r"[0-9a-z@$|!\u0400-\u04ff\u0370-\u03ffıłøßſđƅɡɑɩɴ]+")
 
 
-def _map_homoglyphs(t: str) -> str:
-    """숫자→문자 치환은 라틴 문자가 섞인 토큰 안에서만(전화번호 '7070' 이 'toto' 가 되는 것 방지)."""
+def _map_homoglyphs(t: str, alt_i: bool = False) -> str:
+    """유사문자 치환. 숫자→문자 치환은 (치환 후) 라틴 문자가 섞인 토큰 안에서만(전화번호 '7070' 이 'toto' 가 되는 것 방지).
+    alt_i=True 면 1/|/! 을 l 대신 i 로 읽는다."""
     def repl(m: re.Match) -> str:
         tok = m.group(0)
-        if any("a" <= c <= "z" for c in tok):
-            return "".join(HOMOGLYPHS.get(c, c) for c in tok)
-        return "".join(HOMOGLYPHS.get(c, c) if c not in _DIGIT_HOMO else c for c in tok)
+        letters = "".join(HOMOGLYPHS.get(c, c) if c not in _DIGIT_HOMO else c for c in tok)
+        if not any("a" <= c <= "z" for c in letters):
+            return letters
+        out = []
+        for c in tok:
+            if alt_i and c in _ALT_I:
+                out.append(_ALT_I[c])
+            else:
+                out.append(HOMOGLYPHS.get(c, c))
+        return "".join(out)
     return _ALNUM_RUN.sub(repl, t)
 
 
-def level_homoglyph(text: str) -> str:
+def level_homoglyph(text: str, alt_i: bool = False) -> str:
     """plain + NFKC(전각·호환문자) + 유사문자 치환(HOMOGLYPH 판정용)."""
     t = _nfkc_keep_jamo(level_plain(text))
     t = _strip_noise(t.lower())
-    return _map_homoglyphs(t)
+    return _map_homoglyphs(t, alt_i)
 
 
 def _nfkc_keep_jamo(t: str) -> str:
@@ -113,11 +130,11 @@ def has_jamo(text: str) -> bool:
     return any("\u3131" <= ch <= "\u3163" or "\u1100" <= ch <= "\u11ff" for ch in text or "")
 
 
-def aggressive(text: str) -> str:
+def aggressive(text: str, alt_i: bool = False) -> str:
     """키워드 탐지용 최대 정규화: 자모 합성 → NFKC → 유사문자 치환."""
     t = unicodedata.normalize("NFKC", level_jamo(text))
     t = _strip_noise(t.lower())
-    return _map_homoglyphs(t)
+    return _map_homoglyphs(t, alt_i)
 
 
 def collapse_spaces(text: str) -> str:
@@ -130,14 +147,37 @@ _LATIN = re.compile("[a-zA-Z]")
 _HANGUL = re.compile("[\uac00-\ud7a3]")
 
 
+_WORD = re.compile(r"[\w\u0400-\u04ff\u0370-\u03ff\uac00-\ud7a3@$|!]+")
+_CONSONANT_RUN = re.compile("[\u3131-\u314e]{2,}")
+
+
 def has_homoglyph_chars(text: str) -> bool:
-    """전각 영숫자, 또는 라틴/한글과 섞인 키릴·그리스 문자가 있으면 True."""
+    """전각 영숫자가 있거나, 한 단어 안에 키릴·그리스 문자가 라틴/한글/숫자와 섞여 있으면(스크립트 혼용) True.
+    문장 전체가 키릴인 정상 러시아어 텍스트는 해당하지 않는다."""
     t = text or ""
     if _FULLWIDTH.search(t):
         return True
-    if _CYRILLIC_GREEK.search(t) and (_LATIN.search(t) or _HANGUL.search(t)):
-        return True
+    for tok in _WORD.findall(t):
+        if _CYRILLIC_GREEK.search(tok) and (_LATIN.search(tok) or _HANGUL.search(tok) or re.search(r"\d", tok)):
+            return True
     return False
+
+
+def chosung_of(word: str) -> str | None:
+    """한글 음절 단어 → 초성 문자열(카지노→ㅋㅈㄴ). 음절이 아닌 글자가 있으면 None."""
+    out = []
+    for ch in word:
+        code = ord(ch)
+        if 0xAC00 <= code <= 0xD7A3:
+            out.append(CHO[(code - 0xAC00) // 588])
+        else:
+            return None
+    return "".join(out)
+
+
+def consonant_runs(text: str) -> list[str]:
+    """호환 자음만 2자 이상 이어진 덩어리(ㅋㅈㄴ, ㅌㅌ)."""
+    return _CONSONANT_RUN.findall(text or "")
 
 
 def has_composable_jamo(text: str) -> bool:

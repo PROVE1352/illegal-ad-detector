@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from .normalize import aggressive, has_jamo, level_homoglyph, level_jamo, level_plain
+from .normalize import aggressive, chosung_of, consonant_runs, has_jamo, level_homoglyph, level_jamo, level_plain
 
 CATEGORY_LABEL = {
     "gambling": "도박",
@@ -28,6 +28,9 @@ KEYWORDS: dict[str, list[tuple[str, float]]] = {
         ("보너스코드", 2.5), ("가입코드", 2), ("추천코드", 1.5), ("먹튀없는", 3.5), ("메이저사이트", 3.5),
         ("안전사이트", 2.5), ("배팅", 1.5), ("베팅", 1.5), ("스포츠배팅", 3), ("스포츠베팅", 3), ("라이브배팅", 3),
         ("카지노추천", 4), ("바카라추천", 4), ("토토추천", 4), ("홀덤", 1.5), ("룰렛", 1.5), ("블랙잭", 1.5),
+        ("slot", 1.5), ("slots", 1.5), ("slotmachine", 2.5), ("jackpot", 2), ("poker", 1.5), ("holdem", 2), ("roulette", 1.5),
+        ("blackjack", 2), ("gambling", 1.5), ("onlinecasino", 4), ("livecasino", 3.5), ("freespin", 3), ("freebet", 3),
+        ("bet365", 3), ("betting", 2), ("sportsbet", 3), ("sportsbetting", 3), ("bookmaker", 2.5),
     ],
     "adult": [
         ("성인용품", 2), ("출장안마", 4), ("출장마사지", 4), ("조건만남", 4), ("성인야동", 4), ("야동", 3),
@@ -64,10 +67,19 @@ WHITELIST_CONTEXT: list[tuple[str, float]] = [
     ("성인기", -2), ("성인자녀", -2), ("성인학", -1.5), ("국민체육진흥법", -3), ("처벌", -2), ("위반", -1.5),
     ("방송통신심의위원회", -3), ("유해정보", -2), ("청소년보호", -2), ("사이버수사", -3), ("수사", -1),
     ("운영자검거", -2), ("검거", -2), ("근절", -2), ("정보통신망법", -2), ("청소년", -1),
+    ("초성퀴즈", -4), ("초성", -2), ("자음", -2), ("모음", -1), ("한글교육", -2), ("받침", -2), ("문해교육", -2),
 ]
+
+# 초성 축약(ㅋㅈㄴ=카지노) 판정: 2자 초성은 흔한 채팅 축약과 겹치므로 허용 목록 + 문맥어가 있을 때만
+CHOSUNG_MIN_WEIGHT = 1.5
+CHOSUNG_2CHAR_BLOCK = {"ㅇㄷ", "ㅁㅊ", "ㅊㅊ", "ㄱㅈ", "ㅈㅈ", "ㄱㅅ", "ㅅㄱ", "ㄷㄷ", "ㅎㅇ", "ㅂㅂ", "ㄴㄴ", "ㅇㅇ", "ㅇㅋ", "ㅈㅅ",
+                       "ㅅㅂ", "ㅈㄹ", "ㄱㄱ", "ㅇㅈ", "ㄹㅇ", "ㅂㄹ", "ㅅㅇ", "ㄷㅊ", "ㄷㅂ", "ㅁㄹ", "ㅇㅍ", "ㅋㅋ", "ㅎㅎ", "ㅠㅠ"}
+CHOSUNG_CONTEXT = ("사이트", "추천", "가입", "코드", "보너스", "입금", "환전", "배팅", "베팅", "머니", "이벤트", "주소", "도메인",
+                   "링크", "바로가기", "텔레", "카톡", "문의", "출장", "만남", "대출", "승인", "입플", "첫충", "매충", "꽁")
 
 # 정규화 단계별 사전 캐시: cat -> [(plain, jamo, homo, full, orig, weight)]
 _NORM: dict[str, list[tuple[str, str, str, str, str, float]]] | None = None
+_CHOSUNG: dict[str, list[tuple[str, str, float]]] | None = None   # cat -> [(초성, orig, weight)]
 _NORM_WHITELIST: list[tuple[str, str, float]] | None = None
 
 LEVEL_PLAIN, LEVEL_JAMO, LEVEL_HOMOGLYPH, LEVEL_BOTH = "plain", "JAMO", "HOMOGLYPH", "both"
@@ -81,9 +93,39 @@ def _prepare() -> None:
             for cat, items in KEYWORDS.items()
         }
         _NORM_WHITELIST = [(aggressive(k), k, w) for k, w in WHITELIST_CONTEXT]
+        global _CHOSUNG
+        _CHOSUNG = {}
+        for cat, items in KEYWORDS.items():
+            for k, w in items:
+                cho = chosung_of(k)
+                if cho and w >= CHOSUNG_MIN_WEIGHT and len(cho) >= 2 and cho not in CHOSUNG_2CHAR_BLOCK:
+                    _CHOSUNG.setdefault(cat, []).append((cho, k, w))
 
 
-def match_keywords_levels(text: str) -> dict[str, list[tuple[str, float, str]]]:
+def chosung_hits(text: str) -> dict[str, list[tuple[str, float, str]]]:
+    """초성 축약 매칭(ㅋㅈㄴ→카지노, ㅌㅌ→토토). 레벨은 JAMO.
+    3자 이상 초성은 자음 덩어리 안에 포함되면 인정, 2자 초성은 덩어리 전체가 일치하고 문맥어가 함께 있을 때만."""
+    _prepare()
+    assert _CHOSUNG is not None
+    runs = consonant_runs(text)
+    if not runs:
+        return {}
+    plain = level_plain(text)
+    has_ctx = any(c in plain for c in CHOSUNG_CONTEXT)
+    out: dict[str, list[tuple[str, float, str]]] = {}
+    for cat, items in _CHOSUNG.items():
+        for cho, orig, w in items:
+            ok = False
+            if len(cho) >= 3:
+                ok = any(cho in r for r in runs)
+            elif has_ctx:
+                ok = any(r == cho for r in runs)
+            if ok:
+                out.setdefault(cat, []).append((orig, w, LEVEL_JAMO))
+    return out
+
+
+def match_keywords_levels(text: str, chosung: bool = True) -> dict[str, list[tuple[str, float, str]]]:
     """카테고리별 (키워드, 가중치, 레벨). 레벨: plain / JAMO / HOMOGLYPH / both.
 
     plain  : 난독화 해제 없이도 매칭(공백·특수문자 삽입 정도)
@@ -96,7 +138,10 @@ def match_keywords_levels(text: str) -> dict[str, list[tuple[str, float, str]]]:
     t_plain = level_plain(text)
     t_jamo = level_jamo(text)
     t_homo = level_homoglyph(text)
+    t_homo_i = level_homoglyph(text, alt_i=True) if any(c in text for c in "1|!") else t_homo
     t_full = aggressive(text)
+    t_full_i = aggressive(text, alt_i=True) if t_homo_i is not t_homo else t_full
+    cho_hits = chosung_hits(text) if chosung else {}
     result: dict[str, list[tuple[str, float, str]]] = {}
     for cat, items in _NORM.items():
         hits: list[tuple[str, float, str]] = []
@@ -107,10 +152,13 @@ def match_keywords_levels(text: str) -> dict[str, list[tuple[str, float, str]]]:
                 hits.append((orig, w, LEVEL_PLAIN))
             elif k_jamo in t_jamo:
                 hits.append((orig, w, LEVEL_JAMO))
-            elif k_homo in t_homo:
+            elif k_homo in t_homo or k_homo in t_homo_i:
                 hits.append((orig, w, LEVEL_HOMOGLYPH))
-            elif k_full in t_full:
+            elif k_full in t_full or k_full in t_full_i:
                 hits.append((orig, w, LEVEL_JAMO if has_jamo(text) else LEVEL_HOMOGLYPH))
+        for orig, w, lv in cho_hits.get(cat, []):
+            if not any(h[0] == orig for h in hits):
+                hits.append((orig, w, lv))
         pruned = [h for h in hits if not any(h[0] != o[0] and h[0] in o[0] for o in hits)]
         if pruned:
             result[cat] = pruned
