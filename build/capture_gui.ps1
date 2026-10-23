@@ -25,6 +25,8 @@ public static class IadWin {
 [void][IadWin]::SetProcessDPIAware()
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
+# GUI·Edge 는 작업 폴더가 달라 상대 경로를 다르게 해석하므로 절대 경로로 바꾼다
+$OutDir = (Resolve-Path -LiteralPath $OutDir).Path
 $work = Join-Path $OutDir "capture_work"
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 $marker = Join-Path $work "marker.txt"
