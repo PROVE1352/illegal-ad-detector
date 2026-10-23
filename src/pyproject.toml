@@ -1,0 +1,17 @@
+[project]
+name = "iad"
+version = "0.1.0"
+description = "공공 웹사이트 불법광고 탐지 도구"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+]
+
+[project.optional-dependencies]
+render = ["playwright>=1.45"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
