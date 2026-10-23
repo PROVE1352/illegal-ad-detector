@@ -209,6 +209,42 @@ def evaluate_set(name: str, labels: list[dict], decoys: list[str], root: Path, p
     }
 
 
+REALWORLD = HERE / "fixtures" / "realworld"
+RW_MAX_ETC = 9          # 실사이트 정상 세트: ETC 는 한 자릿수
+RW_MAX_CPU_PER_PAGE = 0.5
+
+
+def evaluate_realworld() -> dict | None:
+    """실사이트 정상 세트(1회 수집한 공개 공공 페이지 + 외부 CSS)를 오프라인 분석: 4종 0건·ETC 상한·쪽당 CPU 상한이 통과 조건."""
+    man_path = REALWORLD / "manifest.json"
+    if not man_path.is_file():
+        return None
+    from iad.analyzer import analyze_page
+    from iad.models import Page
+    man = json.loads(man_path.read_text(encoding="utf-8"))
+    base = urlparse(man["entry_url"]).hostname or ""
+    base = base.removeprefix("www.")
+    official: list[dict] = []
+    extra: list[dict] = []
+    cpu = 0.0
+    for m in man["pages"]:
+        page = Page(url=m["url"], html=(REALWORLD / "pages" / m["file"]).read_text(encoding="utf-8"))
+        page.css_texts = [(REALWORLD / "css" / f).read_text(encoding="utf-8") for f in m["css"]]
+        t = time.process_time()
+        fs = analyze_page(page, base)
+        cpu += time.process_time() - t
+        for f in fs:
+            row = {"url": f.page_url, "location": f.location, "evidence_text": f.evidence_text[:80], "score": f.score}
+            if f.official:
+                official.append({**row, "technique": "+".join(f.official)})
+            elif f.extra_names:
+                extra.append({**row, "extra_finding": "+".join(f.extra_names)})
+    n = max(len(man["pages"]), 1)
+    passed = not official and len(extra) <= RW_MAX_ETC and cpu / n <= RW_MAX_CPU_PER_PAGE
+    return {"set": "realworld", "entry_url": man["entry_url"], "pages": len(man["pages"]), "official_fp": official, "extra": extra,
+            "cpu_per_page": round(cpu / n, 3), "pass": passed}
+
+
 def md_report(results: list[dict], meta: dict) -> str:
     L = [f"# 평가 결과 ({meta['timestamp']})", "",
          f"- 명령: `uv run python src/eval.py` · 깊이 {meta['depth']} · 최대 {meta['max_pages']}페이지 · 포트 {meta['port']}",
@@ -227,6 +263,15 @@ def md_report(results: list[dict], meta: dict) -> str:
     for r in results:
         e = r["extra"]
         L.append(f"| {r['set']} | {e['gold']} | {e['reported']} | {e['hit']} | {e['recall']} | {len(e['false_positives'])} |")
+    rw = meta.get("realworld")
+    if rw:
+        L += ["", "## 실사이트 정상 세트 (fixtures/realworld, 오프라인)", "",
+              f"- 출처: {rw['entry_url']} ({rw['pages']}쪽, 1회 수집) · 통과 조건: 4종 0건 · ETC ≤{RW_MAX_ETC} · 쪽당 CPU ≤{RW_MAX_CPU_PER_PAGE}s",
+              f"- 결과: 4종 {len(rw['official_fp'])}건 · ETC {len(rw['extra'])}건 · 쪽당 CPU {rw['cpu_per_page']}s → **{'PASS' if rw['pass'] else 'FAIL'}**"]
+        for f in rw["official_fp"]:
+            L.append(f"  - [4종 오탐] {f['technique']} `{f['location']}` — “{f['evidence_text']}”")
+        for f in rw["extra"]:
+            L.append(f"  - [ETC] {f['extra_finding']} `{f['location'][-80:]}` — “{f['evidence_text']}”")
     for r in results:
         L += ["", f"## {r['set']} 상세", ""]
         o = r["official"]
@@ -269,6 +314,9 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         httpd.shutdown()
     meta = {"timestamp": time.strftime("%Y-%m-%d %H:%M:%S"), "depth": a.depth, "max_pages": a.max_pages, "port": port}
+    rw = evaluate_realworld()
+    if rw:
+        meta["realworld"] = rw
     (HERE / "eval_result.json").write_text(json.dumps({"meta": meta, "results": results}, ensure_ascii=False, indent=1),
                                            encoding="utf-8")
     md = md_report(results, meta)

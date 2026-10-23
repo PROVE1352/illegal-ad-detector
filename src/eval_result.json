@@ -1,17 +1,26 @@
 {
  "meta": {
-  "timestamp": "2026-10-23 13:28:27",
+  "timestamp": "2026-10-23 13:59:05",
   "depth": 3,
   "max_pages": 300,
-  "port": 8765
+  "port": 8765,
+  "realworld": {
+   "set": "realworld",
+   "entry_url": "https://www.mois.go.kr/frt/bbs/type010/commonSelectBoardList.do?bbsId=BBSMSTR_000000000008",
+   "pages": 10,
+   "official_fp": [],
+   "extra": [],
+   "cpu_per_page": 0.223,
+   "pass": true
+  }
  },
  "results": [
   {
    "set": "dev",
    "entry_url": "http://127.0.0.1:8765/dev/index.html",
    "pages_crawled": 41,
-   "elapsed_sec": 0.29,
-   "tool_elapsed_sec": 0.280003,
+   "elapsed_sec": 0.22,
+   "tool_elapsed_sec": 0.218303,
    "official": {
     "gold": 59,
     "reported_units": 59,
@@ -55,14 +64,14 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_piim25yv"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_dev_v47113m1"
   },
   {
    "set": "holdout",
    "entry_url": "http://127.0.0.1:8765/holdout/index.html",
    "pages_crawled": 41,
-   "elapsed_sec": 0.22,
-   "tool_elapsed_sec": 0.212331,
+   "elapsed_sec": 0.2,
+   "tool_elapsed_sec": 0.193848,
    "official": {
     "gold": 59,
     "reported_units": 59,
@@ -106,7 +115,7 @@
     "missed": []
    },
    "decoy_hits": [],
-   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_m4aw2jb_"
+   "out_dir": "/var/folders/8_/bksndjnx54lggfdmvnr7__9h0000gn/T/iad_eval_holdout_5irnm2f3"
   }
  ]
 }
