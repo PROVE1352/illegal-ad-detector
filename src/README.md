@@ -60,6 +60,10 @@ uv run pytest -q
 
 ## 결과 파일 (요강 붙임4 적용 — 결정 사항)
 
+- **결과 파일 보장(결정)**: 탐지 시작 직후 빈 `findings: []` 로 두 파일을 만들고, 페이지마다(최소 2초 간격) 임시 파일 + `os.replace` 로 원자적
+  갱신한다(meta.finished_at/elapsed_sec 도 매번 갱신). SIGINT/SIGTERM/SIGBREAK 와 프로세스 종료(atexit) 때 마지막 상태를 한 번 더 쓴다.
+  시간 예산(기본 20분)은 벽시계 기준으로 크롤·분석·클로킹·렌더 모두에 적용되어 30분 강제 종료 전에 끝난다. 따라서 평가 중 강제 종료되어도
+  그때까지의 검출이 담긴 유효한 result.json 이 남는다.
 - `result.json`, `result_extra.json` 은 **구동 파일이 있는 폴더**에 생성한다. frozen exe 면 `sys.executable` 의 폴더,
   소스 실행이면 현재 작업 폴더(`--result-dir` 로 변경 가능). UTF-8, BOM 없음, 들여쓰기 2.
 - `meta.topic` 은 요강 예시값 그대로 `"TOPIC"` 을 쓴다(표의 "TOPIC(불법광고)" 는 설명으로 해석). 필수 meta 필드

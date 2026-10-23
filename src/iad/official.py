@@ -96,15 +96,27 @@ def build_extra(findings: list[Finding]) -> list[dict]:
     return out
 
 
+def _atomic_write_json(path: Path, obj: dict) -> None:
+    """임시 파일에 쓰고 os.replace 로 바꿔치기 — 강제 종료 순간에도 깨진(파싱 불가) result.json 이 남지 않게."""
+    tmp = path.with_name(path.name + f".tmp{os.getpid()}")
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fp:   # UTF-8, BOM 없음
+        json.dump(obj, fp, ensure_ascii=False, indent=2)
+        fp.flush()
+        try:
+            os.fsync(fp.fileno())
+        except OSError:
+            pass
+    os.replace(tmp, path)
+
+
 def write_results(findings: list[Finding], entry_url: str, started: datetime, finished: datetime,
                   out_dir: Path | None = None) -> tuple[Path, Path]:
-    d = out_dir or run_dir()
+    """result.json / result_extra.json 을 원자적으로 쓴다(스캔 중 주기적으로 호출되어 중간 결과를 갱신한다)."""
+    d = Path(out_dir) if out_dir else run_dir()
     d.mkdir(parents=True, exist_ok=True)
     meta = build_meta(entry_url, started, finished)
     p1 = d / "result.json"
     p2 = d / "result_extra.json"
-    with open(p1, "w", encoding="utf-8", newline="\n") as fp:   # UTF-8, BOM 없음
-        json.dump({"meta": meta, "findings": build_official(findings)}, fp, ensure_ascii=False, indent=2)
-    with open(p2, "w", encoding="utf-8", newline="\n") as fp:
-        json.dump({"meta": meta, "findings": build_extra(findings)}, fp, ensure_ascii=False, indent=2)
+    _atomic_write_json(p1, {"meta": meta, "findings": build_official(findings)})
+    _atomic_write_json(p2, {"meta": meta, "findings": build_extra(findings)})
     return p1, p2

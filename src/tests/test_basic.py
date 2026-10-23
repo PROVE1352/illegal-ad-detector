@@ -860,3 +860,71 @@ def test_spec_example_locations_reproduced():
     fr = analyze_page(Page(url="http://ex.go.kr/widget/notice", html='<html><body><div class="wrap"><span class="hidden-link" style="display:none">무료 슬롯 체험 바로가기</span></div></body></html>',
                            is_iframe=True, top_url="http://ex.go.kr/board/view?id=1180", frame_prefix='iframe[src="http://ex.go.kr/widget/notice"] >>> '), "ex.go.kr")
     assert [f.location for f in fr if f.official] == ['iframe[src="http://ex.go.kr/widget/notice"] >>> div.wrap > span.hidden-link']
+
+
+# ---------- P0-1: 결과 파일 보장(중간 기록·종료 신호·시간 예산) ----------
+def _slow_site(tmp_path, n=30, delay=0.4):
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):  # noqa: D102
+            pass
+
+        def do_GET(self):
+            import time as _t
+            _t.sleep(delay)
+            i = int(self.path.rsplit("=", 1)[-1]) if "=" in self.path else 0
+            links = "".join(f'<a href="/p?i={k}">글 {k}</a>' for k in range(1, n + 1))
+            ad = '<span style="display:none">토토사이트 안전놀이터</span>' if i % 3 == 1 else ""
+            body = f"<html><body><div class='b'>{links}{ad}</div></body></html>".encode()
+            self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.end_headers(); self.wfile.write(body)
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def test_time_budget_stops_and_result_written(tmp_path):
+    from iad.crawler import CrawlConfig
+    from iad.scan import scan
+    import time as _t
+    srv = _slow_site(tmp_path)
+    try:
+        t0 = _t.monotonic()
+        res = scan(f"http://127.0.0.1:{srv.server_port}/p?i=0", CrawlConfig(delay=0, allowed_hosts=("127.0.0.1",), cloak_pages=0, time_budget_sec=2.0, max_pages=100),
+                   out_dir=tmp_path, result_dir=tmp_path, log=lambda m: None, write_report=False)
+        elapsed = _t.monotonic() - t0
+    finally:
+        srv.shutdown()
+    assert elapsed < 6 and "시간 예산" in res.stopped_reason
+    data = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
+    assert data["meta"]["elapsed_sec"] >= 2 and data["findings"] and data["meta"]["finished_at"]
+
+
+def test_sigterm_leaves_valid_result_files(tmp_path):
+    """스캔 중 SIGTERM 으로 죽여도 result.json 이 유효 JSON 으로 남아야 한다(평가 30분 강제 종료 대비)."""
+    import os, signal, subprocess, sys, time as _t
+    srv = _slow_site(tmp_path, n=50, delay=0.5)
+    code = f"""
+import sys; sys.path.insert(0, {str(SRC)!r})
+from iad.crawler import CrawlConfig
+from iad.scan import scan
+scan("http://127.0.0.1:{srv.server_port}/p?i=0", CrawlConfig(delay=0, allowed_hosts=("127.0.0.1",), cloak_pages=0, time_budget_sec=600, max_pages=500),
+     out_dir={str(tmp_path)!r}, result_dir={str(tmp_path)!r}, log=lambda m: None, write_report=False)
+"""
+    try:
+        proc = subprocess.Popen([sys.executable, "-c", code])
+        _t.sleep(4)
+        proc.send_signal(signal.SIGTERM)
+        try:
+            proc.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    finally:
+        srv.shutdown()
+    for name in ("result.json", "result_extra.json"):
+        data = json.loads((tmp_path / name).read_text(encoding="utf-8"))
+        assert set(data) == {"meta", "findings"} and data["meta"]["entry_url"].endswith("/p?i=0")
+    assert json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))["findings"], "SIGTERM 전까지의 4종 검출이 기록되어야 함"
+    assert not list(tmp_path.glob("result*.tmp*"))
