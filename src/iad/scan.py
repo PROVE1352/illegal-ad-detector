@@ -30,6 +30,7 @@ class ScanResult:
     report_html: Path | None = None
     stopped_reason: str = ""
     render_used: bool = False
+    browser_note: str = ""          # 브라우저(Edge/Chrome headless) 단계 상태 한 줄
 
     @property
     def elapsed(self) -> float:
@@ -168,6 +169,19 @@ def scan(entry_url: str, config: CrawlConfig | None = None, out_dir: Path | None
             checkpoint.write(force=True)
         except Exception as e:
             log(f"클로킹 점검 생략: {e!r}")
+    if cfg.browser and not _over_budget():
+        try:
+            from .browser import browser_stage
+            extra, res.browser_note = browser_stage(res.pages, res.findings, base_host,
+                                                    lambda: max(0.0, deadline - time.monotonic()), log)
+            res.findings.extend(extra)
+            checkpoint.write(force=True)
+        except Exception as e:
+            log("브라우저 단계를 사용할 수 없어 정적 분석 결과로 계속합니다.")
+            logging.getLogger("iad").debug("browser_stage 실패: %s: %s", e.__class__.__name__, e)
+            res.browser_note = f"오류로 생략({e.__class__.__name__})"
+    elif cfg.browser:
+        res.browser_note = "시간 예산 소진으로 생략"
     if render and _over_budget():
         render = False
         log("시간 예산이 남지 않아 렌더 비교를 생략합니다.")

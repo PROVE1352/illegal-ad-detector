@@ -981,3 +981,105 @@ def test_one_char_link():
     assert "ONE_CHAR_LINK" in _etc('<html><body><p>안내 <a href="http://kr-bet777.top/">.</a> 문의</p></body></html>')
     assert _etc('<html><body><p><a href="https://www.korea.kr/">›</a></p></body></html>') == []
     assert _etc('<html><body><p><a href="https://example.com/x">·</a></p></body></html>') == []
+
+
+# ---------- P1-2: 브라우저 단계(Edge/Chrome headless --dump-dom, ETC 전용) ----------
+_STATIC_INJECT = ('<html><head><meta charset="utf-8"></head><body><h1>공지사항</h1>'
+                  '<script>document.write(atob("PGRpdiBzdHlsZT0iZGlzcGxheTpub25lIj48YSBocmVmPSJodHRwOi8va3ItYmV0Nzc3LnRvcCI+7Yag7Yag7IKs7J207Yq4IOy2lOyynCDslYjsoITrhoDsnbTthLA8L2E+PC9kaXY+"));</script>'
+                  '</body></html>')
+_INJECTED = '<div style="display:none"><a href="http://kr-bet777.top">토토사이트 추천 안전놀이터</a></div>'
+_STATIC_SAME = '<html><head><meta charset="utf-8"></head><body><p>안내</p><script>document.getElementById("x").innerHTML = "<b>공지</b>";</script></body></html>'
+
+
+def _fake_browser(tmp_path: Path) -> str:
+    fake = tmp_path / "fakebrowser.py"
+    fake.write_text(
+        "import sys, time\n"
+        "url = sys.argv[-1]\n"
+        "assert '--dump-dom' in sys.argv and any(a.startswith('--user-data-dir=') for a in sys.argv)\n"
+        "if url.endswith('slow.html'):\n    time.sleep(30)\n"
+        "if url.endswith('fail.html'):\n    sys.exit(1)\n"
+        "if url.endswith('inject.html'):\n"
+        f"    sys.stdout.buffer.write({_STATIC_INJECT!r}.replace('</body>', {_INJECTED!r} + '</body>').encode('utf-8'))\n"
+        "else:\n"
+        f"    sys.stdout.buffer.write({_STATIC_SAME!r}.encode('utf-8'))\n", encoding="utf-8")
+    return str(fake)
+
+
+def test_browser_stage_fake_browser(tmp_path, monkeypatch):
+    from iad import browser as B
+    monkeypatch.setenv("IAD_BROWSER", _fake_browser(tmp_path))
+    monkeypatch.setattr(B, "PER_PAGE_TIMEOUT", 2.0)
+    pages = [Page(url="http://ex.go.kr/inject.html", html=_STATIC_INJECT),
+             Page(url="http://ex.go.kr/same.html", html=_STATIC_SAME),
+             Page(url="http://ex.go.kr/slow.html", html=_STATIC_SAME),
+             Page(url="http://ex.go.kr/fail.html", html=_STATIC_SAME),
+             Page(url="http://ex.go.kr/clean.html", html="<html><body><p>스크립트 없음</p></body></html>")]
+    assert B.is_suspicious_page(_STATIC_INJECT) and not B.is_suspicious_page(pages[-1].html)
+    static = analyze_page(pages[0], "ex.go.kr")
+    assert not any(f.official for f in static)   # 정적으로는 주입 결과를 볼 수 없다(스크립트 ETC 만)
+    t0 = __import__("time").monotonic()
+    out, note = B.browser_stage(pages, static, "ex.go.kr", lambda: 100.0, lambda m: None)
+    assert __import__("time").monotonic() - t0 < 15, note
+    assert len(out) == 1 and out[0].page_url == "http://ex.go.kr/inject.html", [(f.location, f.extra_names) for f in out]
+    f = out[0]
+    assert not f.official and "DYNAMIC_INJECTION" in f.extra_names and f.location.startswith("div") and any("kr-bet777.top" in u for u in f.links)
+    assert "2쪽 렌더" in note and "2쪽 실패" in note, note
+
+
+def test_browser_stage_fails_closed(tmp_path, monkeypatch):
+    from iad import browser as B
+    monkeypatch.setenv("IAD_BROWSER", str(tmp_path / "no-such-browser"))
+    out, note = B.browser_stage([Page(url="http://ex.go.kr/a", html=_STATIC_INJECT)], [], "ex.go.kr", lambda: 100.0, lambda m: None)
+    assert out == [] and "없음" in note
+    assert B.dump_dom(str(tmp_path / "no-such-browser"), "http://127.0.0.1:9/") is None
+
+
+def test_scan_browser_stage_goes_to_result_extra_only(tmp_path, monkeypatch):
+    from iad.testbed import pick_port, serve
+    from iad.crawler import CrawlConfig
+    from iad.scan import scan
+    (tmp_path / "fb").mkdir(exist_ok=True)
+    monkeypatch.setenv("IAD_BROWSER", _fake_browser(tmp_path / "fb"))
+    port = pick_port(0)
+    (tmp_path / "inject.html").write_text(_STATIC_INJECT, encoding="utf-8")
+    srv = serve(tmp_path, port)
+    try:
+        res = scan(f"http://127.0.0.1:{port}/inject.html", CrawlConfig(delay=0, allowed_hosts=("127.0.0.1", "localhost"), cloak_pages=0),
+                   out_dir=tmp_path / "out", result_dir=tmp_path / "out", log=lambda m: None, write_report=False)
+    finally:
+        srv.shutdown()
+    official = json.loads((tmp_path / "out" / "result.json").read_text(encoding="utf-8"))["findings"]
+    extra = json.loads((tmp_path / "out" / "result_extra.json").read_text(encoding="utf-8"))["findings"]
+    assert official == []
+    assert any(e["extra_finding"] == "DYNAMIC_INJECTION" or "DYNAMIC_INJECTION" in e["extra_finding"] for e in extra), extra
+    assert "1쪽 렌더" in res.browser_note
+
+
+_LIVE = None
+try:
+    import os as _os
+    if not _os.environ.get("IAD_BROWSER"):
+        from iad.browser import find_browser as _fb
+        _LIVE = _fb()
+except Exception:
+    _LIVE = None
+
+
+@pytest.mark.skipif(not _LIVE, reason="Edge/Chrome 없음")
+def test_browser_stage_live_chrome(tmp_path, monkeypatch):
+    """실제 브라우저로 document.write 주입을 회수한다(설치된 PC 에서만)."""
+    from iad import browser as B
+    from iad.testbed import pick_port, serve
+    monkeypatch.delenv("IAD_BROWSER", raising=False)
+    port = pick_port(0)
+    (tmp_path / "inject.html").write_text(_STATIC_INJECT, encoding="utf-8")
+    srv = serve(tmp_path, port)
+    try:
+        url = f"http://127.0.0.1:{port}/inject.html"
+        html = B.dump_dom(_LIVE, url)
+        assert html and "kr-bet777.top" in html, (html or "")[:300]
+        out, note = B.browser_stage([Page(url=url, html=_STATIC_INJECT)], [], "127.0.0.1", lambda: 60.0, lambda m: None)
+    finally:
+        srv.shutdown()
+    assert out and "DYNAMIC_INJECTION" in out[0].extra_names and not out[0].official, note

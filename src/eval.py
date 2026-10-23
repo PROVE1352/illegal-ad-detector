@@ -131,7 +131,7 @@ def evaluate_set(name: str, labels: list[dict], decoys: list[str], root: Path, p
     logs: list[str] = []
     t0 = time.monotonic()
     res = scan(entry, CrawlConfig(depth=depth, max_pages=max_pages, delay=0.0, timeout=5,
-                                  allowed_hosts=("127.0.0.1", "localhost")),
+                                  allowed_hosts=("127.0.0.1", "localhost"), browser=False),   # 하네스는 결정적·오프라인(브라우저 단계는 별도 테스트)
                out_dir=out_dir, result_dir=out_dir, log=logs.append, write_report=True)
     elapsed = time.monotonic() - t0
     official = json.loads((out_dir / "result.json").read_text(encoding="utf-8"))["findings"]

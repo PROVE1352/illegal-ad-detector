@@ -141,6 +141,15 @@ TRANSPARENT/OFFSCREEN; 부모가 display:none 이고 자식에 광고가 있으�
 스크립트 주입·인코딩 근거는 디코딩/주입 내용에 비신뢰 외부 URL 또는 불법 키워드가 있을 때만 강하게(정상 jQuery 템플릿·분석 스크립트는 1.0/0.5).
 짧은 키워드(영문 ≤8자, 한글 ≤2자)는 JSON/CSS/JS 의 따옴표·괄호·콜론 경계를 넘어 이어 붙은 우연한 일치("s1":"ot"→slot)를 세지 않는다.
 
+브라우저 단계(P1-2, 기본 켬, `--no-browser`/GUI 체크로 끔): OS 에 이미 설치된 Edge/Chrome 을 `--headless=new --dump-dom --virtual-time-budget=5000`
+으로 띄워(추가 의존성 없음, 임시 프로필, 페이지당 15초·단계 5분·남은 시간 예산 안) 인라인 스크립트에 document.write/innerHTML/appendChild/
+eval/atob 등 DOM 주입 흔적이 있는 최상위 페이지(최대 30쪽)만 JS 실행 후 DOM 을 한 번 더 분석한다. **정적 HTML 에 없던(선택자가 안 풀리거나 내용이
+달라진) 요소만 ETC `DYNAMIC_INJECTION` 으로 result_extra 에 넣고 result.json 에는 넣지 않는다** — 채점자의 location 은 수집한 HTML 기준으로 풀릴
+가능성이 높고, 4종은 확신 높은 것만 넣는다는 원칙 때문. 탐색 순서는 IAD_BROWSER 환경변수 → Windows 레지스트리 App Paths(msedge/chrome) →
+Program Files·LOCALAPPDATA 표준 경로 → PATH. 정책 HeadlessModeEnabled=0 이면 건너뛰고, 실행 파일이 없거나 호출이 실패·타임아웃이면 정적 결과만
+남긴다(Windows 실측은 하지 않았으므로 "실패하면 정적"이 설계 전제). 하네스(eval.py)는 결정적 비교를 위해 browser=False 로 돌리고, 브라우저 경로는
+가짜 브라우저 스크립트(주입·동일·타임아웃·실패) 테스트와 설치된 Chrome 의 실제 document.write 회수 테스트로 검증한다.
+
 정적 추가 신호(P1-1, 모두 ETC 전용·4종 게이트에 넣지 않음): `HEAD_KEYWORD_INJECTION`(title·meta description/keywords·og:title 에 가중치 ≥2.0
 불법 키워드 + 유인 표현 또는 합계 ≥3.0, 행정 안내 문맥이면 제외), `FOREIGN_GAMBLING`(judi·gacor·togel·maxwin·博彩·娱乐城 등 외국어 도박 상투어가
 서로 다른 2개 이상이거나 불법 키워드와 동반, 라틴어는 단어 경계라 judicial·prejudice 제외), `ONE_CHAR_LINK`(한 글자·구두점 하나에 외부 의심
