@@ -109,14 +109,48 @@ def _atomic_write_json(path: Path, obj: dict) -> None:
     os.replace(tmp, path)
 
 
+def _writable(d: Path) -> bool:
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        probe = d / f".iad-write-test-{os.getpid()}"
+        probe.write_bytes(b"ok")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def fallback_dirs() -> list[Path]:
+    """결과 폴더 폴백 순서: 현재 작업 폴더 → %LOCALAPPDATA%\\IllegalAdDetector(없으면 사용자 홈/IllegalAdDetector)."""
+    out = [Path.cwd()]
+    base = os.environ.get("LOCALAPPDATA")
+    out.append((Path(base) if base else Path.home()) / "IllegalAdDetector")
+    return out
+
+
+def resolve_result_dir(preferred: Path | None) -> tuple[Path, bool]:
+    """(실제로 쓸 폴더, 폴백 여부). 선호 폴더(없으면 exe 폴더)가 쓰기 불가(Program Files·읽기 전용 USB)면 폴백 순서대로 쓰기 시험을 한다."""
+    first = Path(preferred) if preferred else run_dir()
+    if _writable(first):
+        return first, False
+    for d in fallback_dirs():
+        if d.resolve() != first.resolve() and _writable(d):
+            return d, True
+    return first, False
+
+
 def write_results(findings: list[Finding], entry_url: str, started: datetime, finished: datetime,
-                  out_dir: Path | None = None) -> tuple[Path, Path]:
-    """result.json / result_extra.json 을 원자적으로 쓴다(스캔 중 주기적으로 호출되어 중간 결과를 갱신한다)."""
+                  out_dir: Path | None = None, official: bool = True, extra: bool = True,
+                  official_meta: dict | None = None) -> tuple[Path, Path]:
+    """result.json / result_extra.json 을 원자적으로 쓴다(스캔 중 주기적으로 호출되어 중간 결과를 갱신한다).
+    official=False 면 result.json 은 건드리지 않는다(4종 확정 후 ETC 전용 단계가 돌 때)."""
     d = Path(out_dir) if out_dir else run_dir()
     d.mkdir(parents=True, exist_ok=True)
     meta = build_meta(entry_url, started, finished)
     p1 = d / "result.json"
     p2 = d / "result_extra.json"
-    _atomic_write_json(p1, {"meta": meta, "findings": build_official(findings)})
-    _atomic_write_json(p2, {"meta": meta, "findings": build_extra(findings)})
+    if official:
+        _atomic_write_json(p1, {"meta": official_meta or meta, "findings": build_official(findings)})
+    if extra:
+        _atomic_write_json(p2, {"meta": meta, "findings": build_extra(findings)})
     return p1, p2

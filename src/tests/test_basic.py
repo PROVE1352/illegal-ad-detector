@@ -1236,3 +1236,57 @@ def test_ocr_skipped_without_windows(monkeypatch):
     cmd, env = O.build_command("powershell.exe", "list.json")
     assert cmd[1:6] == ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand"] and env["IAD_OCR_LIST"] == "list.json"
     assert __import__("base64").b64decode(cmd[6]).decode("utf-16-le").lstrip().startswith("$ErrorActionPreference")
+
+
+# ---------- R11: 결과 폴더 쓰기 불가 폴백 + result.json 은 4종 확정 시점에 고정 ----------
+def test_result_dir_fallback_when_unwritable(tmp_path, monkeypatch):
+    import os as _os
+    import stat
+    from iad.official import resolve_result_dir
+    from iad.scan import ScanResult, _Checkpoint
+    from iad.official import KST
+    from datetime import datetime
+    if _os.name != "nt" and _os.geteuid() == 0:
+        pytest.skip("root 는 읽기 전용 폴더에도 쓸 수 있다")
+    ro = tmp_path / "ro"
+    ro.mkdir()
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+    if _os.name == "nt":
+        pytest.skip("Windows 는 chmod 로 읽기 전용 폴더를 만들 수 없다")
+    ro.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        d, fb = resolve_result_dir(ro)
+        assert fb and d.resolve() == cwd.resolve(), (d, fb)
+        logs: list[str] = []
+        res = ScanResult(entry_url="http://ex.go.kr", started=datetime.now(KST), finished=datetime.now(KST))
+        cp = _Checkpoint(res, "http://ex.go.kr", ro, logs.append)
+        paths = cp.write(force=True, final=True)
+        assert paths and paths[0].parent.resolve() == cwd.resolve() and paths[0].is_file()
+        assert res.result_dir_note and any("쓸 수 없어" in m for m in logs)
+    finally:
+        ro.chmod(stat.S_IRWXU)
+
+
+def test_result_json_frozen_after_official_phase(tmp_path):
+    from iad.scan import ScanResult, _Checkpoint
+    from iad.official import KST
+    from datetime import datetime
+    from iad.models import Finding
+    res = ScanResult(entry_url="http://ex.go.kr", started=datetime.now(KST), finished=datetime.now(KST))
+    cp = _Checkpoint(res, "http://ex.go.kr", tmp_path, lambda m: None)
+    cp.write(force=True)
+    cp.freeze_official()
+    meta1 = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))["meta"]
+    assert res.official_finished is not None
+    # 이후 ETC 전용 단계가 finding 을 추가해도 result.json 은 그대로, result_extra.json 만 갱신
+    f = Finding(page_url="http://ex.go.kr/a", css_path="p", tag="p", snippet="x", html="<p>x</p>", location="p", extra_names=["CLOAKING"])
+    f.add("cloak.diff", "봇 전용 DOM", 3.0, "script")
+    res.findings.append(f)
+    __import__("time").sleep(1.1)
+    cp.write(force=True, final=True)
+    meta2 = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))["meta"]
+    extra = json.loads((tmp_path / "result_extra.json").read_text(encoding="utf-8"))
+    assert meta2 == meta1, (meta1, meta2)
+    assert extra["findings"] and extra["meta"]["finished_at"] >= meta1["finished_at"]

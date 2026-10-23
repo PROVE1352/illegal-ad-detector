@@ -174,7 +174,7 @@ class App(tk.Tk):
         self.tree.delete(*self.tree.get_children())
         cfg = CrawlConfig(depth=self.depth.get(), max_pages=self.max_pages.get(), delay=self.delay.get(),
                           respect_robots=self.robots.get(), follow_external_iframes=self.ext_iframe.get(),
-                          cloak_pages=40 if self.cloak.get() else 0, browser=self.browser.get(), ocr=self.ocr.get())
+                          cloak_pages=20 if self.cloak.get() else 0, browser=self.browser.get(), ocr=self.ocr.get())
         render = self.render.get()
 
         def work() -> None:
@@ -243,7 +243,7 @@ class App(tk.Tk):
         self.open_btn.configure(state="normal")
         n_off = sum(len(f.official) for f in res.findings)
         self.summary.configure(text=f"페이지 {len(res.pages)}개 · 탐지 {len(res.findings)}건 (요강 4종 {n_off}건, 추가 {len(res.findings) - sum(1 for f in res.findings if f.official and not f.extra_names)}건) · "
-                                    f"소요 {res.elapsed:.1f}초 · result.json: {res.result_json}")
+                                    f"소요 {res.elapsed:.1f}초 · result.json: {res.result_json}" + (f" · {res.result_dir_note}" if res.result_dir_note else ""))
         areas = sorted({area_of(f) for f in res.findings})
         self.f_area.configure(values=("전체", *areas))
         self.f_area.set("전체")
